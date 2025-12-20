@@ -10,6 +10,7 @@ import com.shivdhaba.food_delivery.dto.response.AuthResponse;
 import com.shivdhaba.food_delivery.dto.response.OtpResponse;
 import com.shivdhaba.food_delivery.dto.response.UserResponse;
 import com.shivdhaba.food_delivery.exception.UnauthorizedException;
+import com.shivdhaba.food_delivery.repository.DeliveryBoyDetailsRepository;
 import com.shivdhaba.food_delivery.repository.UserRepository;
 import com.shivdhaba.food_delivery.util.JwtUtil;
 import com.shivdhaba.food_delivery.util.OtpUtil;
@@ -27,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 public class AuthService {
     
     private final UserRepository userRepository;
+    private final DeliveryBoyDetailsRepository deliveryBoyDetailsRepository;
     private final OtpUtil otpUtil;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
@@ -69,24 +71,47 @@ public class AuthService {
         // Delete OTP after verification
         redisTemplate.delete(otpKey);
         
-        // Find or create user
-        User user = userRepository.findByMobileNumberAndRole(mobileNumber, role)
-                .orElseGet(() -> {
-                    User newUser = User.builder()
-                            .mobileNumber(mobileNumber)
-                            .role(role)
-                            .isActive(true)
-                            .build();
-                    return userRepository.save(newUser);
-                });
+        // For delivery boys, they must be pre-registered by admin
+        // For customers, auto-create if doesn't exist
+        User user;
+        if (role == Role.DELIVERY_BOY) {
+            // Delivery boys must be pre-registered - don't auto-create
+            user = userRepository.findByMobileNumberAndRole(mobileNumber, role)
+                    .orElseThrow(() -> new UnauthorizedException(
+                            "Delivery boy not registered. Please contact admin to register your account."));
+            
+            // Also verify that DeliveryBoyDetails exists (created by admin)
+            if (deliveryBoyDetailsRepository.findByUser(user).isEmpty()) {
+                throw new UnauthorizedException(
+                        "Delivery boy account incomplete. Please contact admin to complete registration.");
+            }
+        } else {
+            // For customers, auto-create if doesn't exist
+            user = userRepository.findByMobileNumberAndRole(mobileNumber, role)
+                    .orElseGet(() -> {
+                        User newUser = User.builder()
+                                .mobileNumber(mobileNumber)
+                                .role(role)
+                                .isActive(true)
+                                .build();
+                        return userRepository.save(newUser);
+                    });
+        }
         
         if (!user.getIsActive()) {
             throw new UnauthorizedException("User account is inactive");
         }
         
-        // Generate tokens
-        String accessToken = jwtUtil.generateAccessToken(user.getMobileNumber(), user.getRole().name());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getMobileNumber());
+        // Generate tokens - For delivery boys, tokens expire at midnight (12 AM)
+        String accessToken;
+        String refreshToken;
+        if (role == Role.DELIVERY_BOY) {
+            accessToken = jwtUtil.generateAccessTokenUntilMidnight(user.getMobileNumber(), user.getRole().name());
+            refreshToken = jwtUtil.generateRefreshTokenUntilMidnight(user.getMobileNumber());
+        } else {
+            accessToken = jwtUtil.generateAccessToken(user.getMobileNumber(), user.getRole().name());
+            refreshToken = jwtUtil.generateRefreshToken(user.getMobileNumber());
+        }
         
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -179,8 +204,16 @@ public class AuthService {
                 throw new UnauthorizedException("User account is inactive");
             }
             
-            String newAccessToken = jwtUtil.generateAccessToken(user.getMobileNumber(), user.getRole().name());
-            String newRefreshToken = jwtUtil.generateRefreshToken(user.getMobileNumber());
+            // For delivery boys, tokens expire at midnight (12 AM)
+            String newAccessToken;
+            String newRefreshToken;
+            if (user.getRole() == Role.DELIVERY_BOY) {
+                newAccessToken = jwtUtil.generateAccessTokenUntilMidnight(user.getMobileNumber(), user.getRole().name());
+                newRefreshToken = jwtUtil.generateRefreshTokenUntilMidnight(user.getMobileNumber());
+            } else {
+                newAccessToken = jwtUtil.generateAccessToken(user.getMobileNumber(), user.getRole().name());
+                newRefreshToken = jwtUtil.generateRefreshToken(user.getMobileNumber());
+            }
             
             return AuthResponse.builder()
                     .accessToken(newAccessToken)

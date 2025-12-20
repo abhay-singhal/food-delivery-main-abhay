@@ -12,6 +12,7 @@ import com.shivdhaba.food_delivery.repository.*;
 import com.shivdhaba.food_delivery.service.NotificationService;
 import com.shivdhaba.food_delivery.service.OrderService;
 import com.shivdhaba.food_delivery.service.PaymentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -157,11 +158,13 @@ public class AdminController {
     
     @PostMapping("/delivery-boys")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createDeliveryBoy(
-            @RequestParam String mobileNumber,
-            @RequestParam String fullName,
-            @RequestParam(required = false) String licenseNumber,
-            @RequestParam(required = false) String vehicleNumber,
-            @RequestParam(required = false) String vehicleType) {
+            @Valid @RequestBody com.shivdhaba.food_delivery.dto.request.DeliveryBoyRegisterRequest request) {
+        
+        String mobileNumber = request.getMobileNumber();
+        String fullName = request.getFullName();
+        String licenseNumber = request.getLicenseNumber();
+        String vehicleNumber = request.getVehicleNumber();
+        String vehicleType = request.getVehicleType();
         
         if (userRepository.existsByMobileNumberAndRole(mobileNumber, Role.DELIVERY_BOY)) {
             throw new BadRequestException("Delivery boy already exists");

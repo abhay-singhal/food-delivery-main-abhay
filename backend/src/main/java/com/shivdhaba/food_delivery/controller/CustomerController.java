@@ -14,6 +14,7 @@ import com.shivdhaba.food_delivery.service.ReviewService;
 import com.shivdhaba.food_delivery.util.SecurityUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +26,7 @@ import java.util.HashMap;
 @RestController
 @RequestMapping("/api/v1/customer")
 @RequiredArgsConstructor
+@Slf4j
 public class CustomerController {
     
     private final OrderService orderService;
@@ -81,8 +83,13 @@ public class CustomerController {
         OrderResponse order = orderService.getOrder(orderId);
         
         // Verify order belongs to customer
-        if (!order.getCustomerId().equals(customerId)) {
-            return ResponseEntity.status(403).build();
+        if (order.getCustomerId() == null || !order.getCustomerId().equals(customerId)) {
+            log.warn("Access denied: Order {} does not belong to customer {}", orderId, customerId);
+            return ResponseEntity.status(403)
+                    .body(ApiResponse.<OrderResponse>builder()
+                            .success(false)
+                            .message("Access denied. This order does not belong to you.")
+                            .build());
         }
         
         return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()

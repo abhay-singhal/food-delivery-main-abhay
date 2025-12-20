@@ -34,6 +34,7 @@ public class OrderService {
     private final OrderNumberGenerator orderNumberGenerator;
     private final DistanceUtil distanceUtil;
     private final NotificationService notificationService;
+    private final OrderAssignmentService orderAssignmentService;
     
     @Value("${delivery.city}")
     private String deliveryCity;
@@ -216,6 +217,11 @@ public class OrderService {
                         title, "Your order has been accepted");
             }
             case READY -> {
+                // When order becomes READY, notify all available delivery partners
+                // This triggers the assignment flow - all eligible partners receive push notification
+                orderAssignmentService.notifyAvailableDeliveryPartners(order.getId());
+                
+                // Also notify assigned delivery partner if already assigned
                 if (order.getDeliveryBoy() != null) {
                     notificationService.sendNotificationToUser(order.getDeliveryBoy().getId(),
                             title, "Order #" + order.getOrderNumber() + " is ready for pickup");
@@ -230,6 +236,9 @@ public class OrderService {
                         title, "Your order has been delivered");
                 notificationService.sendNotificationToRole("ADMIN",
                         title, "Order #" + order.getOrderNumber() + " has been delivered");
+                
+                // Release delivery partner when order is delivered
+                orderAssignmentService.releaseDeliveryPartner(order.getId());
             }
             default -> {
                 // No notification for other statuses

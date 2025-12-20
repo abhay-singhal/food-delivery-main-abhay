@@ -1,0 +1,86 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+android {
+
+    // ✅ NDK VERSION MUST MATCH ROOT PROJECT
+    ndkVersion rootProject.ext.ndkVersion
+
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.deliveryboyapp"
+
+    defaultConfig {
+        applicationId "com.deliveryboyapp"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        
+        // ✅ ADD THIS FOR REANIMATED NDK FIX
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+        
+        // ✅ ADD THIS FOR VECTOR ICONS
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file("debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+    
+    // ✅ ADD THIS TO AVOID DUPLICATE LIBRARY CONFLICTS
+    packagingOptions {
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+    }
+}
+
+dependencies {
+
+    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:flipper-integration")
+
+    // ✅ ANDROIDX (ONLY ONCE)
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "androidx.core:core-ktx:1.10.1"
+    implementation "androidx.activity:activity-ktx:1.9.0"
+    implementation "androidx.fragment:fragment-ktx:1.6.1"
+    implementation "androidx.constraintlayout:constraintlayout:2.1.4"
+    
+    // Google Play Services Location
+    implementation "com.google.android.gms:play-services-location:21.0.1"
+    
+    // LocalBroadcastManager (for service-to-module communication)
+    implementation "androidx.localbroadcastmanager:localbroadcastmanager:1.1.0"
+
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation "org.webkit:android-jsc:+"
+    }
+}
+
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+applyNativeModulesAppBuildGradle(project)

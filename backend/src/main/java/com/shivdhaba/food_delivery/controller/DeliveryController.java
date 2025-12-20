@@ -39,10 +39,20 @@ public class DeliveryController {
     private final DeliveryTrackingRepository deliveryTrackingRepository;
     private final NotificationService notificationService;
     private final SecurityUtil securityUtil;
+    private final com.shivdhaba.food_delivery.service.OrderAssignmentService orderAssignmentService;
+    private final com.shivdhaba.food_delivery.service.LocationBroadcastService locationBroadcastService;
     
     @GetMapping("/orders/available")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getAvailableOrders() {
-        List<Order> orders = orderRepository.findUnassignedOrdersByStatus(OrderStatus.READY);
+        // Get orders that are READY (ready for delivery) OR PLACED/ACCEPTED/PREPARING (waiting to be ready)
+        // This allows delivery partners to see orders even before they're marked as READY
+        List<OrderStatus> availableStatuses = List.of(
+            OrderStatus.PLACED,
+            OrderStatus.ACCEPTED,
+            OrderStatus.PREPARING,
+            OrderStatus.READY
+        );
+        List<Order> orders = orderRepository.findUnassignedOrdersByStatuses(availableStatuses);
         List<OrderResponse> orderResponses = orders.stream()
                 .map(orderService::mapToOrderResponse)
                 .toList();
@@ -59,25 +69,8 @@ public class DeliveryController {
             Authentication authentication) {
         var deliveryBoy = securityUtil.getCurrentUser(authentication);
         
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
-        
-        if (order.getStatus() != OrderStatus.READY) {
-            throw new BadRequestException("Order is not ready for delivery");
-        }
-        
-        if (order.getDeliveryBoy() != null) {
-            throw new BadRequestException("Order is already assigned");
-        }
-        
-        order.setDeliveryBoy(deliveryBoy);
-        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
-        order = orderRepository.save(order);
-        
-        // Send notification to customer
-        notificationService.sendNotificationToUser(order.getCustomer().getId(),
-                "Order Out for Delivery",
-                "Your order #" + order.getOrderNumber() + " is out for delivery");
+        // Use assignment service for concurrency-safe assignment
+        Order order = orderAssignmentService.assignOrder(orderId, deliveryBoy.getId());
         
         return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()
                 .success(true)
@@ -109,14 +102,14 @@ public class DeliveryController {
                 .build();
         deliveryTrackingRepository.save(tracking);
         
-        // Update delivery boy location
-        DeliveryBoyDetails details = deliveryBoyDetailsRepository.findByUser(order.getDeliveryBoy())
-                .orElse(null);
-        if (details != null) {
-            details.setCurrentLatitude(latitude);
-            details.setCurrentLongitude(longitude);
-            deliveryBoyDetailsRepository.save(details);
-        }
+        // Update and broadcast location to customer and admin
+        locationBroadcastService.updateAndBroadcastLocation(
+                deliveryBoy.getId(), 
+                orderId, 
+                latitude, 
+                longitude, 
+                address
+        );
         
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
@@ -147,6 +140,9 @@ public class DeliveryController {
         if (order.getPaymentMethod() == com.shivdhaba.food_delivery.domain.enums.PaymentMethod.COD) {
             paymentService.markCodCollected(orderId);
         }
+        
+        // Release delivery partner (makes them available for new orders)
+        orderAssignmentService.releaseDeliveryPartner(orderId);
         
         // Send notifications
         notificationService.sendNotificationToUser(order.getCustomer().getId(),
