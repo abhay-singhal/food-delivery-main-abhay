@@ -5,6 +5,7 @@ import {fetchMenu} from '../store/slices/menuSlice';
 import {loadCart} from '../store/slices/cartSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {restoreSession} from '../store/slices/authSlice';
+import {authService} from '../services/authService';
 
 const SplashScreen = ({navigation}) => {
   const dispatch = useDispatch();
@@ -16,17 +17,25 @@ const SplashScreen = ({navigation}) => {
 
   const initializeApp = async () => {
     try {
-      // Restore auth session
-      const userStr = await AsyncStorage.getItem('user');
-      const accessToken = await AsyncStorage.getItem('accessToken');
-      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      // Check and refresh token if needed (30-day persistent login)
+      const isAuth = await authService.isAuthenticated();
 
-      if (userStr && accessToken) {
-        dispatch(restoreSession({
-          user: JSON.parse(userStr),
-          accessToken,
-          refreshToken,
-        }));
+      if (isAuth) {
+        // Restore auth session
+        const userStr = await AsyncStorage.getItem('user');
+        const accessToken = await AsyncStorage.getItem('accessToken');
+        const refreshToken = await AsyncStorage.getItem('refreshToken');
+
+        if (userStr && accessToken) {
+          dispatch(restoreSession({
+            user: JSON.parse(userStr),
+            accessToken,
+            refreshToken,
+          }));
+        }
+      } else {
+        // Token expired or invalid, clear session
+        console.log('Session expired or invalid, user needs to login');
       }
 
       // Load cart from storage

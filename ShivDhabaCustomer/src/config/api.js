@@ -108,28 +108,21 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       
       try {
-        const refreshToken = await AsyncStorage.getItem('refreshToken');
-        if (refreshToken) {
-          const response = await axios.post(
-            `${API_BASE_URL}/auth/refresh`,
-            {},
-            {
-              headers: {
-                Authorization: `Bearer ${refreshToken}`,
-              },
-            }
-          );
-          
-          const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-          await AsyncStorage.setItem('accessToken', accessToken);
-          await AsyncStorage.setItem('refreshToken', newRefreshToken);
-          
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        // Import authService dynamically to avoid circular dependency
+        const {authService} = require('../services/authService');
+        const refreshed = await authService.refreshAccessToken();
+        
+        if (refreshed && refreshed.accessToken) {
+          originalRequest.headers.Authorization = `Bearer ${refreshed.accessToken}`;
           return api(originalRequest);
         }
       } catch (refreshError) {
-        await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
-        // Navigate to login
+        console.error('Token refresh failed:', refreshError);
+        // Only clear tokens if refresh token is also expired
+        if (refreshError.message?.includes('expired') || refreshError.response?.status === 401) {
+          const {authService} = require('../services/authService');
+          await authService.logout();
+        }
         return Promise.reject(refreshError);
       }
     }

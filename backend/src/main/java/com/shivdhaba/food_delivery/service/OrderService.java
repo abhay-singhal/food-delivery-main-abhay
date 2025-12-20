@@ -44,6 +44,9 @@ public class OrderService {
     @Value("${delivery.charge-per-km}")
     private BigDecimal chargePerKm;
     
+    @Value("${delivery.free-delivery-radius-km}")
+    private Double freeDeliveryRadiusKm;
+    
     @Transactional
     public OrderResponse placeOrder(Long customerId, PlaceOrderRequest request) {
         // Validate delivery city
@@ -94,7 +97,16 @@ public class OrderService {
         // Calculate delivery charge
         double distance = distanceUtil.getDistanceFromRestaurant(
                 request.getDeliveryLatitude(), request.getDeliveryLongitude());
-        BigDecimal deliveryCharge = BigDecimal.valueOf(distance).multiply(chargePerKm);
+        
+        // Free delivery if within free delivery radius
+        BigDecimal deliveryCharge;
+        if (distance <= freeDeliveryRadiusKm) {
+            deliveryCharge = BigDecimal.ZERO;
+        } else {
+            // Calculate charge for distance beyond free delivery radius
+            double chargeableDistance = distance - freeDeliveryRadiusKm;
+            deliveryCharge = BigDecimal.valueOf(chargeableDistance).multiply(chargePerKm);
+        }
         
         BigDecimal totalAmount = subtotal.add(deliveryCharge);
         

@@ -12,10 +12,25 @@ export const placeOrder = createAsyncThunk(
   'order/placeOrder',
   async (orderData, {rejectWithValue}) => {
     try {
+      console.log('Placing order with data:', JSON.stringify(orderData, null, 2));
       const response = await orderService.placeOrder(orderData);
+      console.log('Order service response:', JSON.stringify(response, null, 2));
+      
+      // Backend returns ApiResponse: {success, message, data: {order: {...}}}
+      // Return the entire ApiResponse so CheckoutScreen can access result.success, result.data.order, etc.
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to place order');
+      console.error('Place order thunk error:', error);
+      console.error('Error response:', error.response?.data);
+      
+      // Extract detailed error message
+      const errorMessage = 
+        error.response?.data?.message || 
+        error.response?.data?.error || 
+        error.message || 
+        'Failed to place order';
+      
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -51,8 +66,13 @@ const orderSlice = createSlice({
       })
       .addCase(placeOrder.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.currentOrder = action.payload;
-        state.orders.unshift(action.payload);
+        // Backend returns: {success: true, message: "...", data: {order: {...}}}
+        // Store the order object, not the entire ApiResponse
+        const order = action.payload?.data?.order || action.payload?.data || action.payload;
+        state.currentOrder = order;
+        if (order) {
+          state.orders.unshift(order);
+        }
       })
       .addCase(placeOrder.rejected, (state, action) => {
         state.isLoading = false;

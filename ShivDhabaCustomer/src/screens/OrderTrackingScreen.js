@@ -11,7 +11,7 @@ import {
 import {useSelector} from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MapView, {Marker, Polyline} from 'react-native-maps';
-import orderService from '../services/orderService';
+import {orderService} from '../services/orderService';
 import firestoreService from '../services/firestoreService';
 
 const OrderTrackingScreen = ({navigation, route}) => {
@@ -46,7 +46,18 @@ const OrderTrackingScreen = ({navigation, route}) => {
   const fetchOrderDetails = async () => {
     try {
       setIsLoading(true);
-      const orderData = await orderService.getOrder(orderId);
+      const response = await orderService.getOrder(orderId);
+      
+      // Backend returns ApiResponse: {success: true, message: "...", data: OrderResponse}
+      // orderService.getOrder returns response.data which is the ApiResponse object
+      const orderData = response?.data || response;
+      
+      if (!orderData) {
+        throw new Error('Order data not found in response');
+      }
+      
+      console.log('Order data received:', JSON.stringify(orderData, null, 2));
+      
       setOrder(orderData);
       
       // Set initial map region
@@ -60,7 +71,8 @@ const OrderTrackingScreen = ({navigation, route}) => {
       }
     } catch (error) {
       console.error('Error fetching order:', error);
-      Alert.alert('Error', 'Failed to load order details');
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      Alert.alert('Error', error?.message || 'Failed to load order details');
     } finally {
       setIsLoading(false);
     }
@@ -294,63 +306,97 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
     backgroundColor: '#FF6B35',
-    elevation: 4,
+    elevation: 8,
+    shadowColor: '#FF6B35',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#FFF',
+    letterSpacing: 0.5,
   },
   orderInfo: {
     backgroundColor: '#FFF',
-    padding: 20,
-    margin: 15,
-    borderRadius: 8,
-    elevation: 2,
+    padding: 22,
+    margin: 18,
+    borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   orderNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 12,
+    letterSpacing: 0.3,
   },
   statusBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   statusText: {
     color: '#FFF',
-    fontWeight: 'bold',
+    fontWeight: '700',
     fontSize: 14,
+    letterSpacing: 0.5,
   },
   section: {
     backgroundColor: '#FFF',
-    padding: 15,
-    marginHorizontal: 15,
-    marginBottom: 15,
-    borderRadius: 8,
-    elevation: 2,
+    padding: 20,
+    marginHorizontal: 18,
+    marginBottom: 18,
+    borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 10,
+    letterSpacing: 0.3,
   },
   sectionContent: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
+    lineHeight: 22,
+    fontWeight: '500',
   },
   mapContainer: {
-    height: 300,
-    margin: 15,
-    borderRadius: 8,
+    height: 320,
+    margin: 18,
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 2,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   map: {
     flex: 1,
@@ -375,19 +421,26 @@ const styles = StyleSheet.create({
   },
   locationInfo: {
     position: 'absolute',
-    bottom: 10,
-    left: 10,
-    right: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 10,
-    borderRadius: 8,
-    elevation: 3,
+    bottom: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: 14,
+    borderRadius: 16,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
   },
   locationInfoText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A1A1A',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
 });
 

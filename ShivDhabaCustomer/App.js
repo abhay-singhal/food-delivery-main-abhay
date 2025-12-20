@@ -12,6 +12,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import AdminDriverTrackingScreen from './src/screens/AdminDriverTrackingScreen';
 import DeliveryLocationTrackingScreen from './src/screens/DeliveryLocationTrackingScreen';
+import LocationPickerScreen from './src/screens/LocationPickerScreen';
+import MenuItemDetailScreen from './src/screens/MenuItemDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -27,12 +29,14 @@ const App = () => {
           <Stack.Screen name="Splash" component={SplashScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Menu" component={MenuScreen} />
+          <Stack.Screen name="MenuItemDetail" component={MenuItemDetailScreen} />
           <Stack.Screen name="Cart" component={CartScreen} />
           <Stack.Screen name="Checkout" component={CheckoutScreen} />
           <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="AdminDriverTracking" component={AdminDriverTrackingScreen} />
           <Stack.Screen name="DeliveryLocationTracking" component={DeliveryLocationTrackingScreen} />
+          <Stack.Screen name="LocationPicker" component={LocationPickerScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </Provider>
