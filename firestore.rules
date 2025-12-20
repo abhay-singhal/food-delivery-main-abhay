@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to get user ID
+    function getUserId() {
+      return request.auth.uid;
+    }
+    
+    // Helper function to check if user is admin
+    // Note: You'll need to set custom claims in Firebase Auth for admin users
+    // This assumes you're storing user role in a 'users' collection
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(getUserId())) &&
+             get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'ADMIN';
+    }
+    
+    // Helper function to check if user is delivery boy
+    function isDeliveryBoy() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(getUserId())) &&
+             get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'DELIVERY_BOY';
+    }
+    
+    // Helper function to check if user is customer
+    function isCustomer() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(getUserId())) &&
+             get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'CUSTOMER';
+    }
+    
+    // Helper function to check if order belongs to customer
+    function isOrderCustomer(orderId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/orders/$(orderId)) &&
+             get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == getUserId();
+    }
+    
+    // Helper function to check if order is assigned to delivery boy
+    function isOrderDeliveryBoy(orderId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/orders/$(orderId)) &&
+             get(/databases/$(database)/documents/orders/$(orderId)).data.driverId == getUserId();
+    }
+    
+    // Users collection - store user metadata
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if isAuthenticated() && userId == getUserId();
+      // Only admins can write user data
+      allow write: if isAdmin();
+    }
+    
+    // Orders collection - store order data with driver location
+    match /orders/{orderId} {
+      // Customers can read their own orders
+      allow read: if isAuthenticated() && (
+        isOrderCustomer(orderId) || 
+        isOrderDeliveryBoy(orderId) ||
+        isAdmin()
+      );
+      
+      // Delivery boys can update driverLocation for their assigned orders
+      allow update: if isDeliveryBoy() && (
+        isOrderDeliveryBoy(orderId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['driverLocation', 'driverId', 'lastLocationUpdate'])
+      );
+      
+      // Admins can write orders
+      allow write: if isAdmin();
+    }
+    
+    // Driver locations collection - track all active driver locations
+    match /driverLocations/{driverId} {
+      // Delivery boys can read and write their own location
+      allow read: if isAuthenticated() && (
+        driverId == getUserId() ||
+        isAdmin()
+      );
+      
+      // Delivery boys can write their own location
+      allow write: if isDeliveryBoy() && driverId == getUserId();
+      
+      // Admins can read all driver locations
+      allow read: if isAdmin();
+    }
+    
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+
