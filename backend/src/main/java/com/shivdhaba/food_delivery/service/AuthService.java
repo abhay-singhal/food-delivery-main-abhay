@@ -3,6 +3,7 @@ package com.shivdhaba.food_delivery.service;
 import com.shivdhaba.food_delivery.domain.entity.User;
 import com.shivdhaba.food_delivery.domain.enums.Role;
 import com.shivdhaba.food_delivery.dto.request.AdminLoginRequest;
+import com.shivdhaba.food_delivery.dto.request.AdminRegisterRequest;
 import com.shivdhaba.food_delivery.dto.request.OtpRequest;
 import com.shivdhaba.food_delivery.dto.request.OtpVerifyRequest;
 import com.shivdhaba.food_delivery.dto.response.AuthResponse;
@@ -14,9 +15,12 @@ import com.shivdhaba.food_delivery.util.JwtUtil;
 import com.shivdhaba.food_delivery.util.OtpUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +30,7 @@ public class AuthService {
     private final OtpUtil otpUtil;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
-    private final OtpStorageService otpStorageService;
+    private final RedisTemplate<String, Object> redisTemplate;
     
     @Value("${otp.expiration-minutes}")
     private int otpExpirationMinutes;
@@ -35,8 +39,9 @@ public class AuthService {
         String mobileNumber = request.getMobileNumber();
         String otp = otpUtil.generateOtp();
         
-        // Store OTP using storage service (Redis or in-memory)
-        otpStorageService.storeOtp(mobileNumber, otp, otpExpirationMinutes);
+        // Store OTP in Redis
+        String otpKey = "otp:" + mobileNumber;
+        redisTemplate.opsForValue().set(otpKey, otp, otpExpirationMinutes, TimeUnit.MINUTES);
         
         // In production, send OTP via SMS service
         // For now, we'll log it (remove in production)
@@ -53,15 +58,16 @@ public class AuthService {
         String mobileNumber = request.getMobileNumber();
         String otp = request.getOtp();
         
-        // Verify OTP from storage service (Redis or in-memory)
-        String storedOtp = otpStorageService.getOtp(mobileNumber);
+        // Verify OTP from Redis
+        String otpKey = "otp:" + mobileNumber;
+        String storedOtp = (String) redisTemplate.opsForValue().get(otpKey);
         
         if (storedOtp == null || !storedOtp.equals(otp)) {
             throw new UnauthorizedException("Invalid or expired OTP");
         }
         
         // Delete OTP after verification
-        otpStorageService.deleteOtp(mobileNumber);
+        redisTemplate.delete(otpKey);
         
         // Find or create user
         User user = userRepository.findByMobileNumberAndRole(mobileNumber, role)
@@ -96,6 +102,40 @@ public class AuthService {
                 .build();
     }
     
+    @Transactional
+    public AuthResponse createAdminUser(AdminRegisterRequest request) {
+        if (userRepository.findByMobileNumber(request.getMobileNumber()).isPresent()) {
+            throw new IllegalArgumentException("User with this mobile number already exists");
+        }
+
+        User adminUser = User.builder()
+                .mobileNumber(request.getMobileNumber())
+                .fullName(request.getFullName())
+                .email(request.getEmail())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .role(Role.ADMIN)
+                .isActive(true)
+                .build();
+
+        adminUser = userRepository.save(adminUser);
+
+        String accessToken = jwtUtil.generateAccessToken(adminUser.getMobileNumber(), adminUser.getRole().name());
+        String refreshToken = jwtUtil.generateRefreshToken(adminUser.getMobileNumber());
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .user(UserResponse.builder()
+                        .id(adminUser.getId())
+                        .mobileNumber(adminUser.getMobileNumber())
+                        .fullName(adminUser.getFullName())
+                        .email(adminUser.getEmail())
+                        .role(adminUser.getRole())
+                        .isActive(adminUser.getIsActive())
+                        .build())
+                .build();
+    }
+
     public AuthResponse adminLogin(AdminLoginRequest request) {
         User admin = userRepository.findByMobileNumberAndRole(request.getUsername(), Role.ADMIN)
                 .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));

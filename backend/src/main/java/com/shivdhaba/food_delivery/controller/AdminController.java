@@ -1,11 +1,13 @@
 package com.shivdhaba.food_delivery.controller;
 
 import com.shivdhaba.food_delivery.domain.entity.*;
+import com.shivdhaba.food_delivery.domain.enums.ItemStatus;
 import com.shivdhaba.food_delivery.domain.enums.OrderStatus;
 import com.shivdhaba.food_delivery.domain.enums.Role;
 import com.shivdhaba.food_delivery.dto.response.ApiResponse;
 import com.shivdhaba.food_delivery.dto.response.OrderResponse;
 import com.shivdhaba.food_delivery.exception.BadRequestException;
+import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import com.shivdhaba.food_delivery.repository.*;
 import com.shivdhaba.food_delivery.service.NotificationService;
 import com.shivdhaba.food_delivery.service.OrderService;
@@ -269,6 +271,21 @@ public class AdminController {
                 .success(true)
                 .message("Config updated successfully")
                 .data(config)
+                .build());
+    }
+
+    @PutMapping("/menu/items/{itemId}/status")
+    public ResponseEntity<ApiResponse<MenuItem>> updateMenuItemStatus(
+            @PathVariable Long itemId,
+            @RequestParam ItemStatus status) {
+        MenuItem item = menuItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Menu item not found"));
+        item.setStatus(status);
+        MenuItem updatedItem = menuItemRepository.save(item);
+        return ResponseEntity.ok(ApiResponse.<MenuItem>builder()
+                .success(true)
+                .message("Menu item status updated successfully")
+                .data(updatedItem)
                 .build());
     }
 }
