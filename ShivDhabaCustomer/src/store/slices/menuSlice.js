@@ -2,8 +2,8 @@ import {createSlice, createAsyncThunk} from '@reduxjs/toolkit';
 import {menuService} from '../../services/menuService';
 
 const initialState = {
-  categories: [],
-  items: [],
+  categories: [], // Always ensure this is an array, never null
+  items: [], // Always ensure this is an array, never null
   isLoading: false,
   error: null,
 };
@@ -47,6 +47,13 @@ const menuSlice = createSlice({
       .addCase(fetchMenu.pending, state => {
         state.isLoading = true;
         state.error = null;
+        // Ensure categories is always an array during loading
+        if (!Array.isArray(state.categories)) {
+          state.categories = [];
+        }
+        if (!Array.isArray(state.items)) {
+          state.items = [];
+        }
       })
       .addCase(fetchMenu.fulfilled, (state, action) => {
         state.isLoading = false;
@@ -60,6 +67,13 @@ const menuSlice = createSlice({
       .addCase(fetchMenu.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
+        // Ensure categories is always an array even on error
+        if (!Array.isArray(state.categories)) {
+          state.categories = [];
+        }
+        if (!Array.isArray(state.items)) {
+          state.items = [];
+        }
       });
   },
 });

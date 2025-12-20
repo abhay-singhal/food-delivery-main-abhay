@@ -26,11 +26,15 @@ const LoginScreen = ({navigation}) => {
     }
 
     try {
-      await dispatch(sendOtp(mobileNumber)).unwrap();
+      const result = await dispatch(sendOtp(mobileNumber)).unwrap();
       setOtpSent(true);
-      Alert.alert('Success', 'OTP sent to your mobile number');
+      // Show OTP in console for development (backend logs it)
+      console.log('OTP sent successfully. Check backend console for OTP.');
+      Alert.alert('Success', 'OTP sent to your mobile number. Check backend console for OTP (development mode).');
     } catch (error) {
-      Alert.alert('Error', error || 'Failed to send OTP');
+      console.error('OTP Send Error:', error);
+      const errorMessage = typeof error === 'string' ? error : error?.message || 'Failed to send OTP';
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -45,7 +49,9 @@ const LoginScreen = ({navigation}) => {
       Alert.alert('Success', 'Login successful');
       navigation.replace('Menu');
     } catch (error) {
-      Alert.alert('Error', error || 'Invalid OTP');
+      console.error('OTP Verify Error:', error);
+      const errorMessage = typeof error === 'string' ? error : error?.message || 'Invalid OTP';
+      Alert.alert('Error', errorMessage);
     }
   };
 

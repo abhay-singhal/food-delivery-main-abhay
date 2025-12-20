@@ -1,13 +1,59 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Platform} from 'react-native';
 
-// Update this with your backend URL
-// For Android Emulator: use 'http://10.0.2.2:8080/api/v1'
-// For iOS Simulator: use 'http://localhost:8080/api/v1'
-// For Physical Device: use 'http://YOUR_COMPUTER_IP:8080/api/v1'
-const API_BASE_URL = 'http://192.168.29.104:8080/api/v1'; // Updated to current IP address
+// API Configuration
+// ============================================
+// Choose your setup:
+// 1. Android Emulator: Use 'EMULATOR'
+// 2. Physical Device: Use your computer's IP address (find with: ipconfig)
+// 3. iOS Simulator: Use 'LOCALHOST'
 
-export {API_BASE_URL};
+const API_CONFIG = {
+  // For Android Emulator
+  EMULATOR: 'http://10.0.2.2:8080/api/v1',
+  
+  // For Physical Device - UPDATE THIS WITH YOUR COMPUTER'S IP
+  // Find your IP: Run 'ipconfig' in CMD, look for IPv4 Address
+  PHYSICAL_DEVICE: 'http://192.168.1.19:8080/api/v1', // Updated with current IP
+  
+  // For iOS Simulator
+  LOCALHOST: 'http://localhost:8080/api/v1',
+};
+
+// ============================================
+// SELECT YOUR CONFIGURATION HERE:
+// ============================================
+// Change this to: 'EMULATOR', 'PHYSICAL_DEVICE', or 'LOCALHOST'
+// For Android Emulator: 'EMULATOR'
+// For Physical Device: 'PHYSICAL_DEVICE'
+const CURRENT_CONFIG = __DEV__ ? 'PHYSICAL_DEVICE' : 'PHYSICAL_DEVICE'; // Auto-select based on dev mode
+
+// Auto-select based on platform (fallback)
+const getApiBaseUrl = () => {
+  // If manually set, use that
+  if (CURRENT_CONFIG && API_CONFIG[CURRENT_CONFIG]) {
+    return API_CONFIG[CURRENT_CONFIG];
+  }
+  
+  // Auto-detect based on platform
+  if (Platform.OS === 'ios') {
+    return API_CONFIG.LOCALHOST;
+  }
+  
+  // Default to emulator for Android
+  return API_CONFIG.EMULATOR;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+console.log('📱 API Configuration:');
+console.log('  Platform:', Platform.OS);
+console.log('  Selected Config:', CURRENT_CONFIG);
+console.log('  API Base URL:', API_BASE_URL);
+console.log('  Backend should be running at:', API_BASE_URL.replace('/api/v1', ''));
+
+export {API_BASE_URL, API_CONFIG};
 
 const api = axios.create({      //
   baseURL: API_BASE_URL, 

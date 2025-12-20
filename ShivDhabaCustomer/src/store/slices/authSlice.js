@@ -17,7 +17,18 @@ export const sendOtp = createAsyncThunk(
       const response = await authService.sendOtp(mobileNumber);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to send OTP');
+      console.error('Send OTP Error:', error);
+      // Handle network errors
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        return rejectWithValue('Network error: Please check your internet connection and ensure the backend server is running');
+      }
+      // Handle HTTP errors
+      if (error.response) {
+        const message = error.response.data?.message || error.response.data?.error || `Server error: ${error.response.status}`;
+        return rejectWithValue(message);
+      }
+      // Handle other errors
+      return rejectWithValue(error.message || 'Failed to send OTP. Please try again.');
     }
   }
 );
@@ -29,7 +40,18 @@ export const verifyOtp = createAsyncThunk(
       const response = await authService.verifyOtp(mobileNumber, otp);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Invalid OTP');
+      console.error('Verify OTP Error:', error);
+      // Handle network errors
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        return rejectWithValue('Network error: Please check your internet connection and ensure the backend server is running');
+      }
+      // Handle HTTP errors
+      if (error.response) {
+        const message = error.response.data?.message || error.response.data?.error || `Server error: ${error.response.status}`;
+        return rejectWithValue(message);
+      }
+      // Handle other errors
+      return rejectWithValue(error.message || 'Invalid OTP. Please try again.');
     }
   }
 );

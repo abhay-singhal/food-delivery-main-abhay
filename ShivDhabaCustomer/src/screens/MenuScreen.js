@@ -178,14 +178,17 @@ const MenuItem = memo(({item, quantity = 0, onQuantityChange, onItemPress, index
 
 MenuItem.displayName = 'MenuItem';
 
-const MenuScreen = ({navigation}) => {
+  const MenuScreen = ({navigation}) => {
   const dispatch = useDispatch();
-  const {categories, isLoading, error} = useSelector(state => state.menu);
+  const {categories: rawCategories, isLoading, error} = useSelector(state => state.menu);
   const {items: cartItems} = useSelector(state => state.cart);
   const {user} = useSelector(state => state.auth);
   const cartAnimation = useRef(new Animated.Value(1)).current;
   const cartScale = useRef(new Animated.Value(1)).current;
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Ensure categories is always an array (null safety)
+  const categories = Array.isArray(rawCategories) ? rawCategories : [];
 
   useEffect(() => {
     dispatch(fetchMenu());
@@ -195,9 +198,13 @@ const MenuScreen = ({navigation}) => {
     if (error) {
       console.log('Menu Error:', error);
     }
-    if (categories && categories.length > 0) {
+    if (Array.isArray(categories) && categories.length > 0) {
       console.log('Menu Categories loaded:', categories.length);
-      console.log('Total items:', categories.reduce((sum, cat) => sum + (cat.items?.length || 0), 0));
+      const totalItems = categories.reduce((sum, cat) => {
+        const items = Array.isArray(cat?.items) ? cat.items : [];
+        return sum + items.length;
+      }, 0);
+      console.log('Total items:', totalItems);
     }
   }, [error, categories]);
 
@@ -350,35 +357,48 @@ const MenuScreen = ({navigation}) => {
           },
         ]}>
         <View style={styles.categoryHeader}>
-          <Text style={styles.categoryIcon}>{getCategoryIcon(category.name)}</Text>
-          <Text style={styles.categoryTitle}>{category.name}</Text>
+          <Text style={styles.categoryIcon}>{getCategoryIcon(category?.name || '')}</Text>
+          <Text style={styles.categoryTitle}>{category?.name || 'Category'}</Text>
         </View>
-        {category.items?.map((menuItem, itemIndex) => (
-          <MenuItem
-            key={menuItem.id}
-            item={menuItem}
-            quantity={cartQuantityMap[menuItem.id] || 0}
-            onQuantityChange={onQuantityChange}
-            onItemPress={onItemPress}
-            index={itemIndex}
-          />
-        ))}
+        {category?.items && Array.isArray(category.items) && category.items.length > 0
+          ? category.items.map((menuItem, itemIndex) => {
+              if (!menuItem || !menuItem.id) return null;
+              return (
+                <MenuItem
+                  key={menuItem.id}
+                  item={menuItem}
+                  quantity={cartQuantityMap[menuItem.id] || 0}
+                  onQuantityChange={onQuantityChange}
+                  onItemPress={onItemPress}
+                  index={itemIndex}
+                />
+              );
+            })
+          : null}
       </Animated.View>
     );
   }, (prevProps, nextProps) => {
     // Custom comparison: return true if props are equal (skip re-render), false if different (re-render)
+    // Add null safety checks
+    if (!prevProps.category || !nextProps.category) return false;
     if (prevProps.category.id !== nextProps.category.id) return false; // Different category, re-render
     if (prevProps.category.name !== nextProps.category.name) return false;
-    if (prevProps.category.items?.length !== nextProps.category.items?.length) return false;
+    
+    // Safe length comparison
+    const prevItemsLength = Array.isArray(prevProps.category.items) ? prevProps.category.items.length : 0;
+    const nextItemsLength = Array.isArray(nextProps.category.items) ? nextProps.category.items.length : 0;
+    if (prevItemsLength !== nextItemsLength) return false;
     
     // Check if any item quantity changed in this category
     // If quantity changed, we need to re-render to show updated quantity
-    const prevItems = prevProps.category.items || [];
+    const prevItems = Array.isArray(prevProps.category.items) ? prevProps.category.items : [];
+    const nextItems = Array.isArray(nextProps.category.items) ? nextProps.category.items : [];
+    
     for (let i = 0; i < prevItems.length; i++) {
       const itemId = prevItems[i]?.id;
       if (itemId) {
-        const prevQty = prevProps.cartQuantityMap[itemId] || 0;
-        const nextQty = nextProps.cartQuantityMap[itemId] || 0;
+        const prevQty = prevProps.cartQuantityMap?.[itemId] || 0;
+        const nextQty = nextProps.cartQuantityMap?.[itemId] || 0;
         if (prevQty !== nextQty) {
           return false; // Quantity changed, need re-render
         }
@@ -386,7 +406,6 @@ const MenuScreen = ({navigation}) => {
     }
     
     // Check if item data changed (name, price, etc.)
-    const nextItems = nextProps.category.items || [];
     for (let i = 0; i < prevItems.length; i++) {
       const prevItem = prevItems[i];
       const nextItem = nextItems[i];
@@ -408,15 +427,21 @@ const MenuScreen = ({navigation}) => {
    * Provides stable reference to FlatList renderItem
    */
   const renderCategory = useCallback(
-    ({item: category, index}) => (
-      <CategoryItem
-        category={category}
-        cartQuantityMap={cartQuantityMap}
-        onQuantityChange={handleQuantityChange}
-        onItemPress={handleItemPress}
-        index={index}
-      />
-    ),
+    ({item: category, index}) => {
+      // Null safety check
+      if (!category || !category.id) {
+        return null;
+      }
+      return (
+        <CategoryItem
+          category={category}
+          cartQuantityMap={cartQuantityMap}
+          onQuantityChange={handleQuantityChange}
+          onItemPress={handleItemPress}
+          index={index}
+        />
+      );
+    },
     [cartQuantityMap, handleQuantityChange, handleItemPress],
   );
 
@@ -427,7 +452,8 @@ const MenuScreen = ({navigation}) => {
    * Safety: Falls back to index if id is missing (shouldn't happen in production)
    */
   const keyExtractor = useCallback((item, index) => {
-    return item?.id != null ? item.id.toString() : `category-${index}`;
+    if (!item) return `category-${index}`;
+    return item.id != null ? item.id.toString() : `category-${index}`;
   }, []);
 
   // Get user initial for profile avatar
@@ -449,24 +475,41 @@ const MenuScreen = ({navigation}) => {
    */
   const filteredCategories = useMemo(() => {
     // Ensure categories is always an array (default to empty array)
-    if (!categories || !Array.isArray(categories)) {
+    if (!categories || !Array.isArray(categories) || categories.length === 0) {
       return [];
     }
     
+    // Ensure each category has items array
+    const validCategories = categories.filter(
+      cat => cat && cat.items && Array.isArray(cat.items) && cat.items.length > 0
+    );
+    
     if (!searchQuery) {
-      return categories;
+      return validCategories;
     }
     
-    return categories
-      .map(category => ({
-        ...category,
-        items: category.items?.filter(
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) {
+      return validCategories;
+    }
+    
+    return validCategories
+      .map(category => {
+        if (!category || !category.items || !Array.isArray(category.items)) {
+          return null;
+        }
+        const filteredItems = category.items.filter(
           item =>
-            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.description?.toLowerCase().includes(searchQuery.toLowerCase()),
-        ),
-      }))
-      .filter(category => category.items && category.items.length > 0);
+            item &&
+            item.name &&
+            (item.name.toLowerCase().includes(query) ||
+            item.description?.toLowerCase().includes(query)),
+        );
+        return filteredItems.length > 0
+          ? {...category, items: filteredItems}
+          : null;
+      })
+      .filter(category => category !== null && category.items && category.items.length > 0);
   }, [categories, searchQuery]);
 
   /**
@@ -536,7 +579,7 @@ const MenuScreen = ({navigation}) => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {searchQuery.length > 0 && (
+          {searchQuery && searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <Icon name="close" size={20} color="#999" />
             </TouchableOpacity>
@@ -545,7 +588,7 @@ const MenuScreen = ({navigation}) => {
       </View>
 
       <FlatList
-        data={filteredCategories || []}
+        data={filteredCategories}
         renderItem={renderCategory}
         keyExtractor={keyExtractor}
         extraData={extraData}
@@ -556,11 +599,6 @@ const MenuScreen = ({navigation}) => {
         updateCellsBatchingPeriod={50}
         initialNumToRender={10}
         windowSize={10}
-        getItemLayout={(data, index) => {
-          // Optional: provide getItemLayout for better performance with fixed heights
-          // Return null if item heights vary
-          return null;
-        }}
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
