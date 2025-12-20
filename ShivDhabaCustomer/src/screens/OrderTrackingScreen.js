@@ -44,6 +44,13 @@ const OrderTrackingScreen = ({navigation, route}) => {
   }, [orderId, order?.status]);
 
   const fetchOrderDetails = async () => {
+    if (!orderId) {
+      console.error('Order ID is missing');
+      Alert.alert('Error', 'Order ID is required');
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       setIsLoading(true);
       const response = await orderService.getOrder(orderId);
@@ -72,7 +79,15 @@ const OrderTrackingScreen = ({navigation, route}) => {
     } catch (error) {
       console.error('Error fetching order:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
-      Alert.alert('Error', error?.message || 'Failed to load order details');
+      console.error('Order ID used:', orderId);
+      
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load order details';
+      Alert.alert('Error', errorMessage, [
+        {
+          text: 'Go Back',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }

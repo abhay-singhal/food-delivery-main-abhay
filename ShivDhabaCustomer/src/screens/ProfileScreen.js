@@ -222,7 +222,7 @@ const ProfileScreen = ({navigation}) => {
           <MenuItem
             icon="history"
             title="My Orders"
-            onPress={() => navigation.navigate('OrderTracking')}
+            onPress={() => navigation.navigate('MyOrders')}
           />
           <MenuItem
             icon="refresh"

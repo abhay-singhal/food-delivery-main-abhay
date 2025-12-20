@@ -249,53 +249,117 @@ const CheckoutScreen = ({navigation}) => {
       console.log('Order data being sent:', JSON.stringify(orderData, null, 2));
 
       // Place order via API
-      const result = await dispatch(placeOrder(orderData)).unwrap();
+      let result;
+      try {
+        result = await dispatch(placeOrder(orderData)).unwrap();
+        console.log('Place order result:', JSON.stringify(result, null, 2));
+      } catch (error) {
+        console.error('Error placing order:', error);
+        // Check if order was actually created (might be a response parsing error)
+        Alert.alert(
+          'Order Status',
+          'There was an issue processing the response, but your order may have been placed. Please check your orders.',
+          [
+            {
+              text: 'Check Orders',
+              onPress: () => navigation.navigate('Profile'),
+            },
+            {text: 'OK', style: 'cancel'},
+          ]
+        );
+        return;
+      }
       
-      console.log('Place order result:', JSON.stringify(result, null, 2));
-      
+      // Backend returns: {success: true, message: "...", data: {order: {...}, razorpayOrderId: "..."}}
       if (result && result.success) {
-        // Backend returns: {success: true, message: "...", data: {order: {...}, razorpayOrderId: "..."}}
         const order = result.data?.order || result.data;
         const orderId = order?.id || order?.orderNumber;
         const razorpayOrderId = result.data?.razorpayOrderId;
+        
+        console.log('Extracted order:', order);
+        console.log('Extracted orderId:', orderId);
+        
+        if (!orderId) {
+          console.error('Order ID not found. Full result:', JSON.stringify(result, null, 2));
+          Alert.alert(
+            'Order Placed',
+            'Your order has been placed successfully, but there was an issue with the order ID. Please check your orders.',
+            [
+              {
+                text: 'Check Orders',
+                onPress: () => navigation.navigate('Profile'),
+              },
+              {text: 'OK', style: 'cancel'},
+            ]
+          );
+          dispatch(clearCart());
+          return;
+        }
         
         // Handle Online Payment (Razorpay)
         if ((paymentMethodUpper === 'ONLINE' || paymentMethodUpper === 'RAZORPAY') && razorpayOrderId) {
           await handleRazorpayPayment(order, orderId, razorpayOrderId);
         } else {
           // COD - Direct success
+          dispatch(clearCart());
           Alert.alert('Success', result.message || 'Order placed successfully!', [
             {
-              text: 'OK',
+              text: 'Track Order',
               onPress: () => {
-                dispatch(clearCart());
-                if (orderId) {
-                  navigation.replace('OrderTracking', {orderId});
-                } else {
-                  navigation.navigate('Menu');
-                }
+                navigation.replace('OrderTracking', {orderId});
               },
             },
           ]);
         }
       } else {
-        Alert.alert('Error', result?.message || 'Failed to place order');
+        // Response doesn't have success flag, but order might still be created
+        console.warn('Response missing success flag:', JSON.stringify(result, null, 2));
+        Alert.alert(
+          'Order Status',
+          'Unable to confirm order status. Please check your orders to verify.',
+          [
+            {
+              text: 'Check Orders',
+              onPress: () => navigation.navigate('Profile'),
+            },
+            {text: 'OK', style: 'cancel'},
+          ]
+        );
       }
     } catch (error) {
       console.error('Place order error:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
       
-      // Extract error message
-      let errorMessage = 'Failed to place order. Please try again.';
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.message) {
-        errorMessage = error.message;
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
+      // Check if it's a network error but order might have been created
+      // Sometimes the response parsing fails but the order is still created
+      if (error?.code === 'ERR_BAD_RESPONSE' || error?.status === 500) {
+        Alert.alert(
+          'Order Status',
+          'There was an issue processing the response, but your order may have been placed successfully. Please check your orders.',
+          [
+            {
+              text: 'Check Orders',
+              onPress: () => {
+                dispatch(clearCart());
+                navigation.navigate('Profile');
+              },
+            },
+            {text: 'Try Again', style: 'cancel'},
+          ]
+        );
+      } else {
+        // Extract error message
+        let errorMessage = 'Failed to place order. Please try again.';
+        if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error?.message) {
+          errorMessage = error.message;
+        } else if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        
+        Alert.alert('Error', errorMessage);
       }
-      
-      Alert.alert('Error', errorMessage);
     }
   };
 

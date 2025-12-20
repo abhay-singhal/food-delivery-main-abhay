@@ -14,6 +14,8 @@ import AdminDriverTrackingScreen from './src/screens/AdminDriverTrackingScreen';
 import DeliveryLocationTrackingScreen from './src/screens/DeliveryLocationTrackingScreen';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
 import MenuItemDetailScreen from './src/screens/MenuItemDetailScreen';
+import MyOrdersScreen from './src/screens/MyOrdersScreen';
+import PaymentScreen from './src/screens/PaymentScreen';
 
 const Stack = createStackNavigator();
 
@@ -33,6 +35,8 @@ const App = () => {
           <Stack.Screen name="Cart" component={CartScreen} />
           <Stack.Screen name="Checkout" component={CheckoutScreen} />
           <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
+          <Stack.Screen name="MyOrders" component={MyOrdersScreen} />
+          <Stack.Screen name="Payment" component={PaymentScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="AdminDriverTracking" component={AdminDriverTrackingScreen} />
           <Stack.Screen name="DeliveryLocationTracking" component={DeliveryLocationTrackingScreen} />

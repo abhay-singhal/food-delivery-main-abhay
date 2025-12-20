@@ -17,8 +17,10 @@ export const placeOrder = createAsyncThunk(
       console.log('Order service response:', JSON.stringify(response, null, 2));
       
       // Backend returns ApiResponse: {success, message, data: {order: {...}}}
+      // orderService.placeOrder already returns response.data (the ApiResponse)
+      // So response here IS the ApiResponse: {success: true, message: "...", data: {order: {...}}}
       // Return the entire ApiResponse so CheckoutScreen can access result.success, result.data.order, etc.
-      return response.data;
+      return response;
     } catch (error) {
       console.error('Place order thunk error:', error);
       console.error('Error response:', error.response?.data);
@@ -40,9 +42,15 @@ export const fetchMyOrders = createAsyncThunk(
   async (_, {rejectWithValue}) => {
     try {
       const response = await orderService.getMyOrders();
-      return response.data;
+      console.log('Fetch my orders response:', JSON.stringify(response, null, 2));
+      
+      // Backend returns ApiResponse: {success: true, message: "...", data: [OrderResponse, ...]}
+      // orderService.getMyOrders returns response.data which is the ApiResponse
+      // Return the entire ApiResponse so the slice can extract the data array
+      return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch orders');
+      console.error('Fetch my orders error:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to fetch orders');
     }
   }
 );
@@ -78,8 +86,21 @@ const orderSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload;
       })
+      .addCase(fetchMyOrders.pending, state => {
+        state.isLoading = true;
+        state.error = null;
+      })
       .addCase(fetchMyOrders.fulfilled, (state, action) => {
-        state.orders = action.payload;
+        state.isLoading = false;
+        // Backend returns: {success: true, message: "...", data: [OrderResponse, ...]}
+        // orderService.getMyOrders returns response.data which is the ApiResponse
+        // So action.payload is the ApiResponse, and we need action.payload.data for the array
+        const ordersArray = action.payload?.data || action.payload;
+        state.orders = Array.isArray(ordersArray) ? ordersArray : [];
+      })
+      .addCase(fetchMyOrders.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
       });
   },
 });
