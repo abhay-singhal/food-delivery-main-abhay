@@ -10,6 +10,7 @@ import com.shivdhaba.food_delivery.exception.BadRequestException;
 import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import com.shivdhaba.food_delivery.repository.*;
 import com.shivdhaba.food_delivery.service.NotificationService;
+import com.shivdhaba.food_delivery.service.OrderAssignmentService;
 import com.shivdhaba.food_delivery.service.OrderService;
 import com.shivdhaba.food_delivery.service.PaymentService;
 import jakarta.validation.Valid;
@@ -30,6 +31,7 @@ public class AdminController {
     
     private final OrderService orderService;
     private final PaymentService paymentService;
+    private final OrderAssignmentService orderAssignmentService;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final DeliveryBoyDetailsRepository deliveryBoyDetailsRepository;
@@ -128,6 +130,19 @@ public class AdminController {
                 .build());
     }
     
+    @PutMapping("/orders/{orderId}/assign")
+    public ResponseEntity<ApiResponse<OrderResponse>> assignOrderToDeliveryBoy(
+            @PathVariable Long orderId,
+            @RequestParam Long deliveryBoyId) {
+        Order assignedOrder = orderAssignmentService.assignOrder(orderId, deliveryBoyId);
+        OrderResponse order = orderService.mapToOrderResponse(assignedOrder);
+        return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()
+                .success(true)
+                .message("Order assigned to delivery boy successfully")
+                .data(order)
+                .build());
+    }
+    
     // Delivery Boys
     @GetMapping("/delivery-boys")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllDeliveryBoys() {
@@ -201,6 +216,88 @@ public class AdminController {
                 .build());
     }
     
+    @PutMapping("/delivery-boys/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateDeliveryBoy(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> updates) {
+        DeliveryBoyDetails details = deliveryBoyDetailsRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery boy not found"));
+        
+        User user = details.getUser();
+        
+        if (updates.containsKey("fullName")) {
+            user.setFullName((String) updates.get("fullName"));
+        }
+        if (updates.containsKey("licenseNumber")) {
+            details.setLicenseNumber((String) updates.get("licenseNumber"));
+        }
+        if (updates.containsKey("vehicleNumber")) {
+            details.setVehicleNumber((String) updates.get("vehicleNumber"));
+        }
+        if (updates.containsKey("vehicleType")) {
+            details.setVehicleType((String) updates.get("vehicleType"));
+        }
+        
+        user = userRepository.save(user);
+        details = deliveryBoyDetailsRepository.save(details);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", details.getId());
+        response.put("userId", user.getId());
+        response.put("name", user.getFullName());
+        response.put("mobile", user.getMobileNumber());
+        response.put("licenseNumber", details.getLicenseNumber());
+        response.put("vehicleNumber", details.getVehicleNumber());
+        response.put("vehicleType", details.getVehicleType());
+        response.put("isAvailable", details.getIsAvailable());
+        response.put("isOnDuty", details.getIsOnDuty());
+        
+        return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
+                .success(true)
+                .message("Delivery boy updated successfully")
+                .data(response)
+                .build());
+    }
+    
+    @PutMapping("/delivery-boys/{id}/status")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateDeliveryBoyStatus(
+            @PathVariable Long id,
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) Boolean isAvailable,
+            @RequestParam(required = false) Boolean isOnDuty) {
+        DeliveryBoyDetails details = deliveryBoyDetailsRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery boy not found"));
+        
+        User user = details.getUser();
+        
+        if (isActive != null) {
+            user.setIsActive(isActive);
+            userRepository.save(user);
+        }
+        if (isAvailable != null) {
+            details.setIsAvailable(isAvailable);
+        }
+        if (isOnDuty != null) {
+            details.setIsOnDuty(isOnDuty);
+        }
+        
+        details = deliveryBoyDetailsRepository.save(details);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", details.getId());
+        response.put("userId", user.getId());
+        response.put("name", user.getFullName());
+        response.put("isActive", user.getIsActive());
+        response.put("isAvailable", details.getIsAvailable());
+        response.put("isOnDuty", details.getIsOnDuty());
+        
+        return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
+                .success(true)
+                .message("Delivery boy status updated successfully")
+                .data(response)
+                .build());
+    }
+    
     // Menu Management
     @GetMapping("/menu/categories")
     public ResponseEntity<ApiResponse<List<MenuCategory>>> getCategories() {
@@ -239,6 +336,60 @@ public class AdminController {
                 .success(true)
                 .message("Menu item created successfully")
                 .data(saved)
+                .build());
+    }
+    
+    @PutMapping("/menu/items/{itemId}")
+    public ResponseEntity<ApiResponse<MenuItem>> updateMenuItem(
+            @PathVariable Long itemId,
+            @RequestBody MenuItem itemUpdate) {
+        MenuItem item = menuItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Menu item not found"));
+        
+        if (itemUpdate.getCategory() != null) {
+            item.setCategory(itemUpdate.getCategory());
+        }
+        if (itemUpdate.getName() != null) {
+            item.setName(itemUpdate.getName());
+        }
+        if (itemUpdate.getDescription() != null) {
+            item.setDescription(itemUpdate.getDescription());
+        }
+        if (itemUpdate.getPrice() != null) {
+            item.setPrice(itemUpdate.getPrice());
+        }
+        if (itemUpdate.getImageUrl() != null) {
+            item.setImageUrl(itemUpdate.getImageUrl());
+        }
+        if (itemUpdate.getIsVegetarian() != null) {
+            item.setIsVegetarian(itemUpdate.getIsVegetarian());
+        }
+        if (itemUpdate.getIsSpicy() != null) {
+            item.setIsSpicy(itemUpdate.getIsSpicy());
+        }
+        if (itemUpdate.getPreparationTimeMinutes() != null) {
+            item.setPreparationTimeMinutes(itemUpdate.getPreparationTimeMinutes());
+        }
+        if (itemUpdate.getDisplayOrder() != null) {
+            item.setDisplayOrder(itemUpdate.getDisplayOrder());
+        }
+        
+        MenuItem updatedItem = menuItemRepository.save(item);
+        return ResponseEntity.ok(ApiResponse.<MenuItem>builder()
+                .success(true)
+                .message("Menu item updated successfully")
+                .data(updatedItem)
+                .build());
+    }
+    
+    @DeleteMapping("/menu/items/{itemId}")
+    public ResponseEntity<ApiResponse<Void>> deleteMenuItem(@PathVariable Long itemId) {
+        MenuItem item = menuItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Menu item not found"));
+        menuItemRepository.delete(item);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("Menu item deleted successfully")
                 .build());
     }
     
