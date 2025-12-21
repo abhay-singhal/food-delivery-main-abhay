@@ -208,5 +208,21 @@ public class DeliveryController {
                 .message("FCM token updated successfully")
                 .build());
     }
+    
+    @PostMapping("/orders/{orderId}/start")
+    public ResponseEntity<ApiResponse<OrderResponse>> startOrder(
+            @PathVariable Long orderId,
+            Authentication authentication) {
+        var deliveryBoy = securityUtil.getCurrentUser(authentication);
+        
+        // Use assignment service to start delivery
+        Order order = orderAssignmentService.startDelivery(orderId, deliveryBoy.getId());
+        
+        return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()
+                .success(true)
+                .message("Order started successfully")
+                .data(orderService.mapToOrderResponse(order))
+                .build());
+    }
 }
 

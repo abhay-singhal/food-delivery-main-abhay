@@ -94,3 +94,4 @@ INSERT INTO orders (
 - Make sure you're logged in as the customer who owns the order
 - If you created the order manually in the database, ensure `customer_id` matches your logged-in user's ID
 
+

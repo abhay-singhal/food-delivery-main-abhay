@@ -172,3 +172,4 @@ If D > R:
 ✅ Fully configurable via `application.properties`  
 ✅ No code changes needed to adjust free delivery radius
 
+

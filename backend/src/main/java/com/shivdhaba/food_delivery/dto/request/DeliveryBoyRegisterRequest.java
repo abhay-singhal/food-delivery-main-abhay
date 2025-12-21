@@ -21,3 +21,4 @@ public class DeliveryBoyRegisterRequest {
     private String vehicleType;
 }
 
+

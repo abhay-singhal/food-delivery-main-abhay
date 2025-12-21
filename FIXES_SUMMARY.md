@@ -106,3 +106,4 @@
 - All tokens are validated on app startup
 - Invalid/expired tokens trigger automatic logout
 
+

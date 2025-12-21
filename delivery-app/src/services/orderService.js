@@ -35,5 +35,12 @@ export const orderService = {
     });
     return response.data;
   },
+
+  startOrder: async (orderId) => {
+    // This endpoint changes order status from READY to OUT_FOR_DELIVERY
+    // If backend doesn't have this endpoint, we'll need to add it
+    const response = await api.post(`/delivery/orders/${orderId}/start`);
+    return response.data;
+  },
 };
 

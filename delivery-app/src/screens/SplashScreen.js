@@ -14,7 +14,7 @@ const SplashScreen = ({navigation}) => {
 
   useEffect(() => {
     if (isAuthenticated !== null) {
-      navigation.replace(isAuthenticated ? 'AvailableOrders' : 'Login');
+      navigation.replace(isAuthenticated ? 'MainTabs' : 'Login');
     }
   }, [isAuthenticated]);
 

@@ -161,26 +161,23 @@ public class OrderAssignmentService {
             throw new BadRequestException("Delivery partner already has an active order");
         }
         
-        // Assign order (with optimistic locking check)
-        // In a real scenario, we'd use @Version field for optimistic locking
-        // For now, we rely on transaction isolation and the checks above
-        
+        // Assign order but keep status as READY (waiting for pickup)
+        // Status will change to OUT_FOR_DELIVERY when delivery partner starts delivery
         order.setDeliveryBoy(deliveryPartner);
-        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
-        order.setOutForDeliveryAt(LocalDateTime.now());
+        // Keep status as READY - delivery partner will start delivery separately
         order = orderRepository.save(order);
         
         // Mark delivery partner as unavailable (they now have an order)
         partnerDetails.setIsAvailable(false);
         deliveryBoyDetailsRepository.save(partnerDetails);
         
-        log.info("Order {} assigned to delivery partner {}", orderId, deliveryPartnerId);
+        log.info("Order {} assigned to delivery partner {} (status: READY)", orderId, deliveryPartnerId);
         
-        // Notify customer that order is out for delivery
+        // Notify customer that order has been assigned
         notificationService.sendNotificationToUser(
                 order.getCustomer().getId(),
-                "Order Out for Delivery",
-                "Your order #" + order.getOrderNumber() + " is out for delivery"
+                "Order Assigned",
+                "Your order #" + order.getOrderNumber() + " has been assigned to a delivery partner"
         );
         
         return order;
@@ -227,6 +224,59 @@ public class OrderAssignmentService {
                         order.getDeliveryBoy().getId(), activeOrders.size());
             }
         }
+    }
+    
+    /**
+     * Start delivery for an assigned order.
+     * Changes order status from READY to OUT_FOR_DELIVERY.
+     * 
+     * @param orderId The order to start delivery for
+     * @param deliveryPartnerId The delivery partner starting the delivery
+     * @return The updated order
+     * @throws BadRequestException if order is not assigned to the partner or not in READY status
+     */
+    @Transactional
+    public Order startDelivery(Long orderId, Long deliveryPartnerId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        
+        // Verify order is assigned to this delivery partner
+        if (order.getDeliveryBoy() == null) {
+            throw new BadRequestException("Order is not assigned to any delivery partner");
+        }
+        
+        if (!order.getDeliveryBoy().getId().equals(deliveryPartnerId)) {
+            throw new BadRequestException("Order is not assigned to you");
+        }
+        
+        // Verify order is in READY status
+        if (order.getStatus() != OrderStatus.READY) {
+            throw new BadRequestException("Order is not ready for delivery. Current status: " + order.getStatus());
+        }
+        
+        // Check if partner already has an active order (OUT_FOR_DELIVERY)
+        List<Order> activeOrders = orderRepository.findByStatusAndDeliveryBoy(
+                OrderStatus.OUT_FOR_DELIVERY, order.getDeliveryBoy());
+        
+        if (!activeOrders.isEmpty()) {
+            throw new BadRequestException("You already have an active order. Please complete it before starting a new one.");
+        }
+        
+        // Change status to OUT_FOR_DELIVERY
+        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+        order.setOutForDeliveryAt(LocalDateTime.now());
+        order = orderRepository.save(order);
+        
+        log.info("Order {} started delivery by partner {}", orderId, deliveryPartnerId);
+        
+        // Notify customer that order is out for delivery
+        notificationService.sendNotificationToUser(
+                order.getCustomer().getId(),
+                "Order Out for Delivery",
+                "Your order #" + order.getOrderNumber() + " is out for delivery"
+        );
+        
+        return order;
     }
 }
 

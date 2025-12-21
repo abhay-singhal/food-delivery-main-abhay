@@ -80,3 +80,4 @@ No additional configuration needed. The feature is automatically enabled for all
 - **Time Zone**: Uses the server's local time zone for midnight calculation
 - **App Restart**: If the app is restarted after midnight, the splash screen will detect expired token and log out
 
+

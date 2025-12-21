@@ -10,18 +10,20 @@ import com.shivdhaba.food_delivery.dto.response.AuthResponse;
 import com.shivdhaba.food_delivery.dto.response.OtpResponse;
 import com.shivdhaba.food_delivery.dto.response.UserResponse;
 import com.shivdhaba.food_delivery.exception.UnauthorizedException;
+import com.shivdhaba.food_delivery.domain.entity.DeliveryBoyDetails;
+import com.shivdhaba.food_delivery.dto.request.DeliveryBoyRegisterRequest;
+import com.shivdhaba.food_delivery.exception.BadRequestException;
 import com.shivdhaba.food_delivery.repository.DeliveryBoyDetailsRepository;
 import com.shivdhaba.food_delivery.repository.UserRepository;
 import com.shivdhaba.food_delivery.util.JwtUtil;
 import com.shivdhaba.food_delivery.util.OtpUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +34,7 @@ public class AuthService {
     private final OtpUtil otpUtil;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final OtpStorageService otpStorageService;
     
     @Value("${otp.expiration-minutes}")
     private int otpExpirationMinutes;
@@ -41,9 +43,8 @@ public class AuthService {
         String mobileNumber = request.getMobileNumber();
         String otp = otpUtil.generateOtp();
         
-        // Store OTP in Redis
-        String otpKey = "otp:" + mobileNumber;
-        redisTemplate.opsForValue().set(otpKey, otp, otpExpirationMinutes, TimeUnit.MINUTES);
+        // Store OTP using OtpStorageService (works with Redis or InMemory)
+        otpStorageService.storeOtp(mobileNumber, otp, otpExpirationMinutes);
         
         // In production, send OTP via SMS service
         // For now, we'll log it (remove in production)
@@ -60,16 +61,23 @@ public class AuthService {
         String mobileNumber = request.getMobileNumber();
         String otp = request.getOtp();
         
-        // Verify OTP from Redis
-        String otpKey = "otp:" + mobileNumber;
-        String storedOtp = (String) redisTemplate.opsForValue().get(otpKey);
+        // Verify OTP using OtpStorageService (works with Redis or InMemory)
+        String storedOtp = otpStorageService.getOtp(mobileNumber);
         
-        if (storedOtp == null || !storedOtp.equals(otp)) {
+        if (storedOtp == null) {
+            System.out.println("OTP verification failed for " + mobileNumber + ": OTP not found or expired");
             throw new UnauthorizedException("Invalid or expired OTP");
         }
         
+        if (!storedOtp.equals(otp)) {
+            System.out.println("OTP verification failed for " + mobileNumber + ": Expected " + storedOtp + ", got " + otp);
+            throw new UnauthorizedException("Invalid or expired OTP");
+        }
+        
+        System.out.println("OTP verification successful for " + mobileNumber);
+        
         // Delete OTP after verification
-        redisTemplate.delete(otpKey);
+        otpStorageService.deleteOtp(mobileNumber);
         
         // For delivery boys, they must be pre-registered by admin
         // For customers, auto-create if doesn't exist
@@ -230,6 +238,52 @@ public class AuthService {
         } catch (Exception e) {
             throw new UnauthorizedException("Invalid refresh token");
         }
+    }
+    
+    /**
+     * Register a delivery boy (public endpoint for self-registration).
+     * Creates both User and DeliveryBoyDetails records.
+     * 
+     * Note: This is a convenience method for development/testing.
+     * In production, consider restricting this endpoint or requiring admin approval.
+     */
+    @Transactional
+    public Map<String, Object> registerDeliveryBoy(DeliveryBoyRegisterRequest request) {
+        String mobileNumber = request.getMobileNumber();
+        String fullName = request.getFullName();
+        
+        // Check if delivery boy already exists
+        if (userRepository.existsByMobileNumberAndRole(mobileNumber, Role.DELIVERY_BOY)) {
+            throw new BadRequestException("Delivery boy with this mobile number already exists");
+        }
+        
+        // Create User
+        User user = User.builder()
+                .mobileNumber(mobileNumber)
+                .fullName(fullName)
+                .role(Role.DELIVERY_BOY)
+                .isActive(true)
+                .build();
+        user = userRepository.save(user);
+        
+        // Create DeliveryBoyDetails
+        DeliveryBoyDetails details = DeliveryBoyDetails.builder()
+                .user(user)
+                .licenseNumber(request.getLicenseNumber())
+                .vehicleNumber(request.getVehicleNumber())
+                .vehicleType(request.getVehicleType())
+                .isAvailable(true)
+                .isOnDuty(false)
+                .build();
+        deliveryBoyDetailsRepository.save(details);
+        
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("id", details.getId());
+        response.put("userId", user.getId());
+        response.put("mobileNumber", user.getMobileNumber());
+        response.put("fullName", user.getFullName());
+        
+        return response;
     }
 }
 

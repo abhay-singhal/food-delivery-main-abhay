@@ -33,7 +33,7 @@ const LoginScreen = ({navigation}) => {
     try {
       await dispatch(verifyOtp({mobileNumber, otp})).unwrap();
       Alert.alert('Success', 'Login successful');
-      navigation.replace('AvailableOrders');
+      navigation.replace('MainTabs');
     } catch (error) {
       Alert.alert('Error', error || 'Invalid OTP');
     }
@@ -156,4 +156,5 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
+
 

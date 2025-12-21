@@ -122,3 +122,4 @@ WHERE o.status IN ('PLACED', 'ACCEPTED', 'PREPARING', 'READY')
 AND o.delivery_boy_id IS NULL
 ORDER BY o.created_at DESC;
 
+

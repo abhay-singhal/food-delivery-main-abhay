@@ -1,5 +1,6 @@
 import api from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {decode} from 'base-64';
 
 export const authService = {
   sendOtp: async (mobileNumber) => {
@@ -63,23 +64,16 @@ export const authService = {
     
     try {
       // Decode JWT token (without verification, just to get expiration)
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      // Use base64 decode for React Native (atob is not available)
+      const payload = JSON.parse(decode(token.split('.')[1]));
       const exp = payload.exp * 1000; // Convert to milliseconds
       const now = Date.now();
       
       // Check if token is expired
+      // Backend sets delivery boy tokens to expire at midnight (12:00 AM)
+      // So if token is expired, it means it's past midnight
       if (now >= exp) {
-        console.log('🕛 Token is expired');
-        return true;
-      }
-      
-      // Check if it's past midnight (12:00 AM)
-      const currentDate = new Date();
-      const midnight = new Date(currentDate);
-      midnight.setHours(24, 0, 0, 0); // Set to midnight (12:00 AM)
-      
-      if (now >= midnight.getTime()) {
-        console.log('🕛 It is past midnight - delivery boy should be logged out');
+        console.log('🕛 Token is expired (past midnight for delivery boys)');
         return true;
       }
       

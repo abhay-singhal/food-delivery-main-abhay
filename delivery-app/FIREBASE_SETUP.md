@@ -56,3 +56,4 @@ The app is configured to:
 1. **Without Firebase**: App should run and show warnings in console
 2. **With Firebase**: After adding google-services.json, notifications should work
 
+
