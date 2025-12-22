@@ -52,3 +52,4 @@ echo You can now rebuild the project.
 echo.
 cd ..
 pause
+

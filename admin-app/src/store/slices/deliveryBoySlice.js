@@ -115,3 +115,4 @@ const deliveryBoySlice = createSlice({
 export const {clearError} = deliveryBoySlice.actions;
 export default deliveryBoySlice.reducer;
 
+
