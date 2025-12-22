@@ -70,9 +70,14 @@ goto fail
 
 set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
 
+@rem CRITICAL FIX: Unset JAVA_TOOL_OPTIONS to prevent memory override
+@rem JAVA_TOOL_OPTIONS is applied BEFORE gradle.properties is read, causing freeze
+@rem This ensures Gradle uses memory settings from gradle.properties
+set JAVA_TOOL_OPTIONS=
 
-@rem Execute Gradle
-"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
+@rem Execute Gradle with explicit memory settings that override any remaining env vars
+@rem These args are passed directly to JVM and take precedence over JAVA_TOOL_OPTIONS
+"%JAVA_EXE%" -Xmx4096m -XX:MaxMetaspaceSize=1024m %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
 
 :end
 @rem End local scope for the variables with windows NT shell
