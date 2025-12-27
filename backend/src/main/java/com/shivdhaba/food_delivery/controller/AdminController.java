@@ -40,6 +40,7 @@ public class AdminController {
     private final AppConfigRepository appConfigRepository;
     private final NotificationService notificationService;
     private final LocationBroadcastService locationBroadcastService;
+    private final com.shivdhaba.food_delivery.util.DistanceUtil distanceUtil;
     private final PasswordEncoder passwordEncoder;
     
     // Dashboard
@@ -273,10 +274,95 @@ public class AdminController {
             config.setDescription(description);
         }
         config = appConfigRepository.save(config);
+        
+        // If restaurant location was updated, reload it in DistanceUtil
+        if (key.equals("restaurant.latitude") || key.equals("restaurant.longitude")) {
+            distanceUtil.reloadRestaurantLocation();
+        }
+        
         return ResponseEntity.ok(ApiResponse.<AppConfig>builder()
                 .success(true)
                 .message("Config updated successfully")
                 .data(config)
+                .build());
+    }
+    
+    // Restaurant Location Configuration
+    @GetMapping("/restaurant/location")
+    public ResponseEntity<ApiResponse<com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse>> getRestaurantLocation() {
+        // Get address from config if available
+        String address = appConfigRepository.findByConfigKey("restaurant.address")
+                .map(AppConfig::getConfigValue)
+                .orElse(null);
+        
+        // Get last updated timestamp
+        LocalDateTime lastUpdated = appConfigRepository.findByConfigKey("restaurant.latitude")
+                .map(AppConfig::getUpdatedAt)
+                .orElse(null);
+        
+        com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse response = 
+                com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse.builder()
+                        .latitude(distanceUtil.getRestaurantLatitude())
+                        .longitude(distanceUtil.getRestaurantLongitude())
+                        .address(address)
+                        .lastUpdatedAt(lastUpdated)
+                        .build();
+        
+        return ResponseEntity.ok(ApiResponse.<com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse>builder()
+                .success(true)
+                .message("Restaurant location retrieved successfully")
+                .data(response)
+                .build());
+    }
+    
+    @PostMapping("/restaurant/location")
+    public ResponseEntity<ApiResponse<com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse>> updateRestaurantLocation(
+            @Valid @RequestBody com.shivdhaba.food_delivery.dto.request.RestaurantLocationRequest request) {
+        
+        // Update latitude
+        AppConfig latConfig = appConfigRepository.findByConfigKey("restaurant.latitude")
+                .orElse(AppConfig.builder()
+                        .configKey("restaurant.latitude")
+                        .description("Restaurant latitude coordinate")
+                        .build());
+        latConfig.setConfigValue(String.valueOf(request.getLatitude()));
+        appConfigRepository.save(latConfig);
+        
+        // Update longitude
+        AppConfig lngConfig = appConfigRepository.findByConfigKey("restaurant.longitude")
+                .orElse(AppConfig.builder()
+                        .configKey("restaurant.longitude")
+                        .description("Restaurant longitude coordinate")
+                        .build());
+        lngConfig.setConfigValue(String.valueOf(request.getLongitude()));
+        appConfigRepository.save(lngConfig);
+        
+        // Update address if provided
+        if (request.getAddress() != null && !request.getAddress().trim().isEmpty()) {
+            AppConfig addressConfig = appConfigRepository.findByConfigKey("restaurant.address")
+                    .orElse(AppConfig.builder()
+                            .configKey("restaurant.address")
+                            .description("Restaurant address")
+                            .build());
+            addressConfig.setConfigValue(request.getAddress());
+            appConfigRepository.save(addressConfig);
+        }
+        
+        // Reload location in DistanceUtil to use new values
+        distanceUtil.reloadRestaurantLocation();
+        
+        com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse response = 
+                com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse.builder()
+                        .latitude(request.getLatitude())
+                        .longitude(request.getLongitude())
+                        .address(request.getAddress())
+                        .lastUpdatedAt(LocalDateTime.now())
+                        .build();
+        
+        return ResponseEntity.ok(ApiResponse.<com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse>builder()
+                .success(true)
+                .message("Restaurant location updated successfully")
+                .data(response)
                 .build());
     }
 

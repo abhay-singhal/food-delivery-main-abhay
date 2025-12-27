@@ -168,11 +168,22 @@ const MyOrdersScreen = ({navigation}) => {
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={styles.trackButton}
+            style={[
+              styles.trackButton,
+              item.status === 'DELIVERED' && styles.trackButtonDisabled
+            ]}
             onPress={() => handleOrderPress(item)}
-            activeOpacity={0.8}>
-            <Text style={styles.trackButtonText}>Track</Text>
-            <Icon name="arrow-forward" size={16} color="#FF6B35" />
+            activeOpacity={0.8}
+            disabled={item.status === 'DELIVERED'}>
+            <Text style={[
+              styles.trackButtonText,
+              item.status === 'DELIVERED' && styles.trackButtonTextDisabled
+            ]}>
+              {item.status === 'DELIVERED' ? 'Delivered' : 'Track'}
+            </Text>
+            {item.status !== 'DELIVERED' && (
+              <Icon name="arrow-forward" size={16} color="#FF6B35" />
+            )}
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -448,6 +459,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  trackButtonDisabled: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#CCCCCC',
+    opacity: 0.6,
+  },
+  trackButtonTextDisabled: {
+    color: '#999999',
   },
   emptyContainer: {
     flex: 1,
