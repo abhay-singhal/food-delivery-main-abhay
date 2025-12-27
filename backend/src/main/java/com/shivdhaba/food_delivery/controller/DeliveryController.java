@@ -4,9 +4,11 @@ import com.shivdhaba.food_delivery.domain.entity.DeliveryBoyDetails;
 import com.shivdhaba.food_delivery.domain.entity.DeliveryTracking;
 import com.shivdhaba.food_delivery.domain.entity.Order;
 import com.shivdhaba.food_delivery.domain.enums.OrderStatus;
+import com.shivdhaba.food_delivery.dto.request.LocationUpdateRequest;
 import com.shivdhaba.food_delivery.dto.response.ApiResponse;
 import com.shivdhaba.food_delivery.dto.response.OrderResponse;
 import com.shivdhaba.food_delivery.dto.response.PaymentResponse;
+import jakarta.validation.Valid;
 import com.shivdhaba.food_delivery.exception.BadRequestException;
 import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import com.shivdhaba.food_delivery.repository.DeliveryBoyDetailsRepository;
@@ -82,9 +84,7 @@ public class DeliveryController {
     @PostMapping("/orders/{orderId}/update-location")
     public ResponseEntity<ApiResponse<Void>> updateLocation(
             @PathVariable Long orderId,
-            @RequestParam Double latitude,
-            @RequestParam Double longitude,
-            @RequestParam(required = false) String address,
+            @Valid @RequestBody LocationUpdateRequest request,
             Authentication authentication) {
         var deliveryBoy = securityUtil.getCurrentUser(authentication);
         Order order = orderRepository.findById(orderId)
@@ -96,9 +96,9 @@ public class DeliveryController {
         
         DeliveryTracking tracking = DeliveryTracking.builder()
                 .order(order)
-                .latitude(latitude)
-                .longitude(longitude)
-                .address(address)
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .address(request.getAddress())
                 .build();
         deliveryTrackingRepository.save(tracking);
         
@@ -106,9 +106,9 @@ public class DeliveryController {
         locationBroadcastService.updateAndBroadcastLocation(
                 deliveryBoy.getId(), 
                 orderId, 
-                latitude, 
-                longitude, 
-                address
+                request.getLatitude(), 
+                request.getLongitude(), 
+                request.getAddress()
         );
         
         return ResponseEntity.ok(ApiResponse.<Void>builder()

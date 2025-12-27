@@ -15,6 +15,11 @@ export const orderService = {
     const response = await api.get(`/customer/orders/${orderId}`);
     return response.data;
   },
+
+  getDeliveryBoyLocation: async (orderId) => {
+    const response = await api.get(`/customer/orders/${orderId}/delivery-boy-location`);
+    return response.data;
+  },
 };
 
 

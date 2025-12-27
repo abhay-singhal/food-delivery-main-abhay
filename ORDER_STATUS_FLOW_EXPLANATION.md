@@ -116,3 +116,5 @@ If you want to see orders immediately without admin intervention, you can:
 - **When order becomes READY**, all delivery partners get notified automatically
 
 
+
+

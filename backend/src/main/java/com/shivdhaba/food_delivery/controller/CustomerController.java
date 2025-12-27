@@ -6,12 +6,15 @@ import com.shivdhaba.food_delivery.dto.response.OrderResponse;
 import com.shivdhaba.food_delivery.dto.response.PaymentResponse;
 import com.shivdhaba.food_delivery.dto.request.ReviewRequest;
 import com.shivdhaba.food_delivery.dto.response.ReviewResponse;
+import com.shivdhaba.food_delivery.service.LocationBroadcastService;
 import com.shivdhaba.food_delivery.service.NotificationService;
 import com.shivdhaba.food_delivery.domain.entity.Order;
 import com.shivdhaba.food_delivery.service.OrderService;
 import com.shivdhaba.food_delivery.service.PaymentService;
 import com.shivdhaba.food_delivery.service.ReviewService;
 import com.shivdhaba.food_delivery.util.SecurityUtil;
+import com.shivdhaba.food_delivery.dto.response.DeliveryBoyLocationResponse;
+import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +36,7 @@ public class CustomerController {
     private final PaymentService paymentService;
     private final NotificationService notificationService;
     private final ReviewService reviewService;
+    private final LocationBroadcastService locationBroadcastService;
     private final SecurityUtil securityUtil;
     
     @PostMapping("/orders")
@@ -175,6 +179,49 @@ public class CustomerController {
                 .success(true)
                 .message("Reviews retrieved successfully")
                 .data(reviews)
+                .build());
+    }
+    
+    @GetMapping("/orders/{orderId}/delivery-boy-location")
+    public ResponseEntity<ApiResponse<DeliveryBoyLocationResponse>> getDeliveryBoyLocation(
+            @PathVariable Long orderId,
+            Authentication authentication) {
+        Long customerId = securityUtil.getCurrentUserId(authentication);
+        OrderResponse order = orderService.getOrder(orderId);
+        
+        // Verify order belongs to customer
+        if (order.getCustomerId() == null || !order.getCustomerId().equals(customerId)) {
+            log.warn("Access denied: Order {} does not belong to customer {}", orderId, customerId);
+            return ResponseEntity.status(403)
+                    .body(ApiResponse.<DeliveryBoyLocationResponse>builder()
+                            .success(false)
+                            .message("Access denied. This order does not belong to you.")
+                            .build());
+        }
+        
+        // Check if order has a delivery boy assigned
+        if (order.getDeliveryBoyId() == null) {
+            return ResponseEntity.ok(ApiResponse.<DeliveryBoyLocationResponse>builder()
+                    .success(true)
+                    .message("No delivery boy assigned to this order yet")
+                    .data(null)
+                    .build());
+        }
+        
+        DeliveryBoyLocationResponse location = locationBroadcastService.getDeliveryBoyLocationForOrder(orderId);
+        
+        if (location == null) {
+            return ResponseEntity.ok(ApiResponse.<DeliveryBoyLocationResponse>builder()
+                    .success(true)
+                    .message("Delivery boy location not available")
+                    .data(null)
+                    .build());
+        }
+        
+        return ResponseEntity.ok(ApiResponse.<DeliveryBoyLocationResponse>builder()
+                .success(true)
+                .message("Delivery boy location retrieved successfully")
+                .data(location)
                 .build());
     }
 }

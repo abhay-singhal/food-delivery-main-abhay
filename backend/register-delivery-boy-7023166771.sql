@@ -71,3 +71,5 @@ FROM users u
 LEFT JOIN delivery_boy_details d ON u.id = d.user_id
 WHERE u.mobile_number = '7023166771' AND u.role = 'DELIVERY_BOY';
 
+
+

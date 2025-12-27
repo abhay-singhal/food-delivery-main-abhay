@@ -9,9 +9,11 @@ import com.shivdhaba.food_delivery.dto.response.OrderResponse;
 import com.shivdhaba.food_delivery.exception.BadRequestException;
 import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import com.shivdhaba.food_delivery.repository.*;
+import com.shivdhaba.food_delivery.service.LocationBroadcastService;
 import com.shivdhaba.food_delivery.service.NotificationService;
 import com.shivdhaba.food_delivery.service.OrderService;
 import com.shivdhaba.food_delivery.service.PaymentService;
+import com.shivdhaba.food_delivery.dto.response.DeliveryBoyLocationResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +39,7 @@ public class AdminController {
     private final MenuItemRepository menuItemRepository;
     private final AppConfigRepository appConfigRepository;
     private final NotificationService notificationService;
+    private final LocationBroadcastService locationBroadcastService;
     private final PasswordEncoder passwordEncoder;
     
     // Dashboard
@@ -289,6 +292,27 @@ public class AdminController {
                 .success(true)
                 .message("Menu item status updated successfully")
                 .data(updatedItem)
+                .build());
+    }
+    
+    // Delivery Boy Location Tracking
+    @GetMapping("/delivery-boys/locations")
+    public ResponseEntity<ApiResponse<List<DeliveryBoyLocationResponse>>> getAllDeliveryBoysLocations() {
+        List<DeliveryBoyLocationResponse> locations = locationBroadcastService.getAllDeliveryBoysLocations();
+        return ResponseEntity.ok(ApiResponse.<List<DeliveryBoyLocationResponse>>builder()
+                .success(true)
+                .message("All delivery boys locations retrieved successfully")
+                .data(locations)
+                .build());
+    }
+    
+    @GetMapping("/delivery-boys/locations/active")
+    public ResponseEntity<ApiResponse<List<DeliveryBoyLocationResponse>>> getActiveDeliveryBoysLocations() {
+        List<DeliveryBoyLocationResponse> locations = locationBroadcastService.getActiveDeliveryBoysLocations();
+        return ResponseEntity.ok(ApiResponse.<List<DeliveryBoyLocationResponse>>builder()
+                .success(true)
+                .message("Active delivery boys locations retrieved successfully")
+                .data(locations)
                 .build());
     }
 }

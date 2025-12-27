@@ -22,6 +22,7 @@ const OrderTrackingScreen = ({navigation, route}) => {
   const [mapRegion, setMapRegion] = useState(null);
   const mapRef = useRef(null);
   const unsubscribeRef = useRef(null);
+  const locationPollingIntervalRef = useRef(null);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -29,19 +30,28 @@ const OrderTrackingScreen = ({navigation, route}) => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
       }
+      if (locationPollingIntervalRef.current) {
+        clearInterval(locationPollingIntervalRef.current);
+      }
     };
   }, [orderId]);
 
   useEffect(() => {
-    if (orderId && order?.status === 'OUT_FOR_DELIVERY') {
+    if (orderId && order?.deliveryBoyId) {
+      // Try Firestore first, fallback to backend API polling
       subscribeToDriverLocation();
+      // Also start polling backend API as backup/primary
+      startLocationPolling();
     }
     return () => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
       }
+      if (locationPollingIntervalRef.current) {
+        clearInterval(locationPollingIntervalRef.current);
+      }
     };
-  }, [orderId, order?.status]);
+  }, [orderId, order?.deliveryBoyId]);
 
   const fetchOrderDetails = async () => {
     if (!orderId) {
@@ -96,50 +106,106 @@ const OrderTrackingScreen = ({navigation, route}) => {
   const subscribeToDriverLocation = () => {
     if (!orderId) return;
 
-    unsubscribeRef.current = firestoreService.subscribeToDriverLocation(
-      orderId,
-      (location, error) => {
-        if (error) {
-          console.error('Error receiving driver location:', error);
-          return;
-        }
-        if (location) {
-          setDriverLocation(location);
-          
-          // Update map region to show both delivery location and driver location
-          if (order?.deliveryLatitude && order?.deliveryLongitude) {
-            const latDelta = Math.max(
-              Math.abs(location.latitude - order.deliveryLatitude) * 2,
-              0.01,
-            );
-            const lngDelta = Math.max(
-              Math.abs(location.longitude - order.deliveryLongitude) * 2,
-              0.01,
-            );
-            
-            setMapRegion({
-              latitude: (location.latitude + order.deliveryLatitude) / 2,
-              longitude: (location.longitude + order.deliveryLongitude) / 2,
-              latitudeDelta: Math.max(latDelta, 0.01),
-              longitudeDelta: Math.max(lngDelta, 0.01),
-            });
+    // Try Firestore subscription (if available)
+    try {
+      unsubscribeRef.current = firestoreService.subscribeToDriverLocation(
+        orderId,
+        (location, error) => {
+          if (error) {
+            console.error('Error receiving driver location from Firestore:', error);
+            return;
+          }
+          if (location) {
+            updateDriverLocation(location);
+          }
+        },
+      );
+    } catch (error) {
+      console.log('Firestore subscription not available, using backend API polling instead');
+    }
+  };
 
-            // Animate map to show both locations
-            if (mapRef.current) {
-              mapRef.current.animateToRegion(
-                {
-                  latitude: (location.latitude + order.deliveryLatitude) / 2,
-                  longitude: (location.longitude + order.deliveryLongitude) / 2,
-                  latitudeDelta: Math.max(latDelta, 0.01),
-                  longitudeDelta: Math.max(lngDelta, 0.01),
-                },
-                1000,
-              );
-            }
+  const startLocationPolling = () => {
+    if (locationPollingIntervalRef.current) {
+      clearInterval(locationPollingIntervalRef.current);
+    }
+
+    // Poll backend API every 10 seconds
+    locationPollingIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await orderService.getDeliveryBoyLocation(orderId);
+        if (response?.success && response?.data) {
+          const locationData = response.data;
+          if (locationData.latitude && locationData.longitude) {
+            updateDriverLocation({
+              latitude: locationData.latitude,
+              longitude: locationData.longitude,
+              address: locationData.address,
+            });
           }
         }
-      },
-    );
+      } catch (error) {
+        console.error('Error polling delivery boy location:', error);
+        // Don't show error to user, just log it
+      }
+    }, 10000); // Poll every 10 seconds
+
+    // Fetch immediately
+    fetchDeliveryBoyLocation();
+  };
+
+  const fetchDeliveryBoyLocation = async () => {
+    try {
+      const response = await orderService.getDeliveryBoyLocation(orderId);
+      if (response?.success && response?.data) {
+        const locationData = response.data;
+        if (locationData.latitude && locationData.longitude) {
+          updateDriverLocation({
+            latitude: locationData.latitude,
+            longitude: locationData.longitude,
+            address: locationData.address,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching delivery boy location:', error);
+    }
+  };
+
+  const updateDriverLocation = (location) => {
+    setDriverLocation(location);
+    
+    // Update map region to show both delivery location and driver location
+    if (order?.deliveryLatitude && order?.deliveryLongitude) {
+      const latDelta = Math.max(
+        Math.abs(location.latitude - order.deliveryLatitude) * 2,
+        0.01,
+      );
+      const lngDelta = Math.max(
+        Math.abs(location.longitude - order.deliveryLongitude) * 2,
+        0.01,
+      );
+      
+      setMapRegion({
+        latitude: (location.latitude + order.deliveryLatitude) / 2,
+        longitude: (location.longitude + order.deliveryLongitude) / 2,
+        latitudeDelta: Math.max(latDelta, 0.01),
+        longitudeDelta: Math.max(lngDelta, 0.01),
+      });
+
+      // Animate map to show both locations
+      if (mapRef.current) {
+        mapRef.current.animateToRegion(
+          {
+            latitude: (location.latitude + order.deliveryLatitude) / 2,
+            longitude: (location.longitude + order.deliveryLongitude) / 2,
+            latitudeDelta: Math.max(latDelta, 0.01),
+            longitudeDelta: Math.max(lngDelta, 0.01),
+          },
+          1000,
+        );
+      }
+    }
   };
 
   const getStatusColor = status => {
