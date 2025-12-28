@@ -38,7 +38,8 @@ export const verifyOtp = createAsyncThunk(
   async ({mobileNumber, otp}, {rejectWithValue}) => {
     try {
       const response = await authService.verifyOtp(mobileNumber, otp);
-      return response.data;
+      // Return the inner data object (user, accessToken, refreshToken)
+      return response.data || response;
     } catch (error) {
       console.error('Verify OTP Error:', error);
       // Handle network errors
@@ -72,6 +73,9 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       state.refreshToken = action.payload.refreshToken;
       state.isAuthenticated = true;
+    },
+    updateUser: (state, action) => {
+      state.user = action.payload;
     },
   },
   extraReducers: builder => {
@@ -114,7 +118,7 @@ const authSlice = createSlice({
   },
 });
 
-export const {clearError, restoreSession} = authSlice.actions;
+export const {clearError, restoreSession, updateUser} = authSlice.actions;
 export default authSlice.reducer;
 
 

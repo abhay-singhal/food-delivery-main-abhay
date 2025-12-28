@@ -228,6 +228,11 @@ export const authService = {
     });
     return response.data;
   },
+
+  updateFullName: async (fullName) => {
+    const response = await api.put('/customer/profile/name', { fullName });
+    return response.data;
+  },
 };
 
 

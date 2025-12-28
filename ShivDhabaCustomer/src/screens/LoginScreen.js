@@ -47,9 +47,17 @@ const LoginScreen = ({navigation}) => {
     }
 
     try {
-      await dispatch(verifyOtp({mobileNumber, otp})).unwrap();
-      Alert.alert('Success', 'Login successful');
-      navigation.replace('Menu');
+      const result = await dispatch(verifyOtp({mobileNumber, otp})).unwrap();
+      const user = result?.user;
+      
+      // Check if user has a name
+      if (!user?.fullName || user.fullName.trim() === '') {
+        // Navigate to name input screen
+        navigation.replace('NameInput');
+      } else {
+        Alert.alert('Success', 'Login successful');
+        navigation.replace('Menu');
+      }
     } catch (error) {
       console.error('OTP Verify Error:', error);
       const errorMessage = typeof error === 'string' ? error : error?.message || 'Invalid OTP';

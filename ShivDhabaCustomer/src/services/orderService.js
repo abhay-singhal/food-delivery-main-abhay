@@ -20,6 +20,11 @@ export const orderService = {
     const response = await api.get(`/customer/orders/${orderId}/delivery-boy-location`);
     return response.data;
   },
+
+  getRestaurantLocation: async () => {
+    const response = await api.get('/customer/restaurant/location');
+    return response.data;
+  },
 };
 
 

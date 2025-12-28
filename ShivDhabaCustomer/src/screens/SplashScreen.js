@@ -27,11 +27,21 @@ const SplashScreen = ({navigation}) => {
         const refreshToken = await AsyncStorage.getItem('refreshToken');
 
         if (userStr && accessToken) {
+          const user = JSON.parse(userStr);
           dispatch(restoreSession({
-            user: JSON.parse(userStr),
+            user,
             accessToken,
             refreshToken,
           }));
+          
+          // Check if user has a name
+          if (!user?.fullName || user.fullName.trim() === '') {
+            // User doesn't have a name, navigate to name input
+            setTimeout(() => {
+              navigation.replace('NameInput');
+            }, 2000);
+            return;
+          }
         }
       } else {
         // Token expired or invalid, clear session

@@ -10,6 +10,7 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import OrderTrackingScreen from './src/screens/OrderTrackingScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import NameInputScreen from './src/screens/NameInputScreen';
 import AdminDriverTrackingScreen from './src/screens/AdminDriverTrackingScreen';
 import DeliveryLocationTrackingScreen from './src/screens/DeliveryLocationTrackingScreen';
 import LocationPickerScreen from './src/screens/LocationPickerScreen';
@@ -30,6 +31,7 @@ const App = () => {
           }}>
           <Stack.Screen name="Splash" component={SplashScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="NameInput" component={NameInputScreen} />
           <Stack.Screen name="Menu" component={MenuScreen} />
           <Stack.Screen name="MenuItemDetail" component={MenuItemDetailScreen} />
           <Stack.Screen name="Cart" component={CartScreen} />

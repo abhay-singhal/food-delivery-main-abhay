@@ -1,11 +1,16 @@
 package com.shivdhaba.food_delivery.controller;
 
 import com.shivdhaba.food_delivery.dto.request.PlaceOrderRequest;
+import com.shivdhaba.food_delivery.dto.request.UpdateFullNameRequest;
 import com.shivdhaba.food_delivery.dto.response.ApiResponse;
 import com.shivdhaba.food_delivery.dto.response.OrderResponse;
 import com.shivdhaba.food_delivery.dto.response.PaymentResponse;
 import com.shivdhaba.food_delivery.dto.request.ReviewRequest;
 import com.shivdhaba.food_delivery.dto.response.ReviewResponse;
+import com.shivdhaba.food_delivery.dto.response.UserResponse;
+import com.shivdhaba.food_delivery.repository.UserRepository;
+import com.shivdhaba.food_delivery.domain.entity.User;
+import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import com.shivdhaba.food_delivery.service.LocationBroadcastService;
 import com.shivdhaba.food_delivery.service.NotificationService;
 import com.shivdhaba.food_delivery.domain.entity.Order;
@@ -13,7 +18,12 @@ import com.shivdhaba.food_delivery.service.OrderService;
 import com.shivdhaba.food_delivery.service.PaymentService;
 import com.shivdhaba.food_delivery.service.ReviewService;
 import com.shivdhaba.food_delivery.util.SecurityUtil;
+import com.shivdhaba.food_delivery.util.DistanceUtil;
 import com.shivdhaba.food_delivery.dto.response.DeliveryBoyLocationResponse;
+import com.shivdhaba.food_delivery.dto.response.RestaurantLocationResponse;
+import com.shivdhaba.food_delivery.repository.AppConfigRepository;
+import com.shivdhaba.food_delivery.domain.entity.AppConfig;
+import java.time.LocalDateTime;
 import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +48,9 @@ public class CustomerController {
     private final ReviewService reviewService;
     private final LocationBroadcastService locationBroadcastService;
     private final SecurityUtil securityUtil;
+    private final DistanceUtil distanceUtil;
+    private final AppConfigRepository appConfigRepository;
+    private final UserRepository userRepository;
     
     @PostMapping("/orders")
     public ResponseEntity<ApiResponse<Map<String, Object>>> placeOrder(
@@ -222,6 +235,59 @@ public class CustomerController {
                 .success(true)
                 .message("Delivery boy location retrieved successfully")
                 .data(location)
+                .build());
+    }
+    
+    @GetMapping("/restaurant/location")
+    public ResponseEntity<ApiResponse<RestaurantLocationResponse>> getRestaurantLocation() {
+        // Get address from config if available
+        String address = appConfigRepository.findByConfigKey("restaurant.address")
+                .map(AppConfig::getConfigValue)
+                .orElse(null);
+        
+        // Get last updated timestamp
+        LocalDateTime lastUpdated = appConfigRepository.findByConfigKey("restaurant.latitude")
+                .map(AppConfig::getUpdatedAt)
+                .orElse(null);
+        
+        RestaurantLocationResponse response = RestaurantLocationResponse.builder()
+                .latitude(distanceUtil.getRestaurantLatitude())
+                .longitude(distanceUtil.getRestaurantLongitude())
+                .address(address)
+                .lastUpdatedAt(lastUpdated)
+                .build();
+        
+        return ResponseEntity.ok(ApiResponse.<RestaurantLocationResponse>builder()
+                .success(true)
+                .message("Restaurant location retrieved successfully")
+                .data(response)
+                .build());
+    }
+    
+    @PutMapping("/profile/name")
+    public ResponseEntity<ApiResponse<UserResponse>> updateFullName(
+            @Valid @RequestBody UpdateFullNameRequest request,
+            Authentication authentication) {
+        Long userId = securityUtil.getCurrentUserId(authentication);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        user.setFullName(request.getFullName());
+        user = userRepository.save(user);
+        
+        UserResponse userResponse = UserResponse.builder()
+                .id(user.getId())
+                .mobileNumber(user.getMobileNumber())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .isActive(user.getIsActive())
+                .build();
+        
+        return ResponseEntity.ok(ApiResponse.<UserResponse>builder()
+                .success(true)
+                .message("Name updated successfully")
+                .data(userResponse)
                 .build());
     }
 }

@@ -19,6 +19,7 @@ const OrderTrackingScreen = ({navigation, route}) => {
   const [order, setOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [driverLocation, setDriverLocation] = useState(null);
+  const [restaurantLocation, setRestaurantLocation] = useState(null);
   const [mapRegion, setMapRegion] = useState(null);
   const mapRef = useRef(null);
   const unsubscribeRef = useRef(null);
@@ -26,6 +27,7 @@ const OrderTrackingScreen = ({navigation, route}) => {
 
   useEffect(() => {
     fetchOrderDetails();
+    fetchRestaurantLocation();
     return () => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
@@ -35,6 +37,42 @@ const OrderTrackingScreen = ({navigation, route}) => {
       }
     };
   }, [orderId]);
+
+  useEffect(() => {
+    // Update map region when restaurant location is loaded
+    if (order?.deliveryLatitude && order?.deliveryLongitude && restaurantLocation) {
+      const locations = [
+        {lat: order.deliveryLatitude, lng: order.deliveryLongitude},
+        {lat: restaurantLocation.latitude, lng: restaurantLocation.longitude},
+      ];
+      
+      if (driverLocation) {
+        locations.push({
+          lat: driverLocation.latitude,
+          lng: driverLocation.longitude,
+        });
+      }
+      
+      const lats = locations.map(loc => loc.lat);
+      const lngs = locations.map(loc => loc.lng);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      
+      const latDelta = Math.max((maxLat - minLat) * 2.2, 0.01);
+      const lngDelta = Math.max((maxLng - minLng) * 2.2, 0.01);
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLng = (minLng + maxLng) / 2;
+      
+      setMapRegion({
+        latitude: centerLat,
+        longitude: centerLng,
+        latitudeDelta: latDelta,
+        longitudeDelta: lngDelta,
+      });
+    }
+  }, [restaurantLocation, order?.deliveryLatitude, order?.deliveryLongitude, driverLocation]);
 
   useEffect(() => {
     if (orderId && order?.deliveryBoyId) {
@@ -100,6 +138,25 @@ const OrderTrackingScreen = ({navigation, route}) => {
       ]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchRestaurantLocation = async () => {
+    try {
+      const response = await orderService.getRestaurantLocation();
+      if (response?.success && response?.data) {
+        const locationData = response.data;
+        if (locationData.latitude && locationData.longitude) {
+          setRestaurantLocation({
+            latitude: locationData.latitude,
+            longitude: locationData.longitude,
+            address: locationData.address,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching restaurant location:', error);
+      // Don't show error to user, just log it
     }
   };
 
@@ -175,37 +232,54 @@ const OrderTrackingScreen = ({navigation, route}) => {
   const updateDriverLocation = (location) => {
     setDriverLocation(location);
     
-    // Update map region to show both delivery location and driver location
-    if (order?.deliveryLatitude && order?.deliveryLongitude) {
-      const latDelta = Math.max(
-        Math.abs(location.latitude - order.deliveryLatitude) * 2,
-        0.01,
-      );
-      const lngDelta = Math.max(
-        Math.abs(location.longitude - order.deliveryLongitude) * 2,
-        0.01,
-      );
-      
-      setMapRegion({
-        latitude: (location.latitude + order.deliveryLatitude) / 2,
-        longitude: (location.longitude + order.deliveryLongitude) / 2,
-        latitudeDelta: Math.max(latDelta, 0.01),
-        longitudeDelta: Math.max(lngDelta, 0.01),
-      });
+      // Update map region to show restaurant, delivery location, and driver location
+      if (order?.deliveryLatitude && order?.deliveryLongitude) {
+        const locations = [
+          {lat: order.deliveryLatitude, lng: order.deliveryLongitude},
+          {lat: location.latitude, lng: location.longitude},
+        ];
+        
+        // Include restaurant location if available
+        if (restaurantLocation) {
+          locations.push({
+            lat: restaurantLocation.latitude,
+            lng: restaurantLocation.longitude,
+          });
+        }
+        
+        // Calculate bounds to fit all locations
+        const lats = locations.map(loc => loc.lat);
+        const lngs = locations.map(loc => loc.lng);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        
+        const latDelta = Math.max((maxLat - minLat) * 2.2, 0.01);
+        const lngDelta = Math.max((maxLng - minLng) * 2.2, 0.01);
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLng = (minLng + maxLng) / 2;
+        
+        setMapRegion({
+          latitude: centerLat,
+          longitude: centerLng,
+          latitudeDelta: latDelta,
+          longitudeDelta: lngDelta,
+        });
 
-      // Animate map to show both locations
-      if (mapRef.current) {
-        mapRef.current.animateToRegion(
-          {
-            latitude: (location.latitude + order.deliveryLatitude) / 2,
-            longitude: (location.longitude + order.deliveryLongitude) / 2,
-            latitudeDelta: Math.max(latDelta, 0.01),
-            longitudeDelta: Math.max(lngDelta, 0.01),
-          },
-          1000,
-        );
+        // Animate map to show all locations
+        if (mapRef.current) {
+          mapRef.current.animateToRegion(
+            {
+              latitude: centerLat,
+              longitude: centerLng,
+              latitudeDelta: latDelta,
+              longitudeDelta: lngDelta,
+            },
+            1000,
+          );
+        }
       }
-    }
   };
 
   const getStatusColor = status => {
@@ -302,6 +376,22 @@ const OrderTrackingScreen = ({navigation, route}) => {
                 }}
                 showsUserLocation={false}
                 showsMyLocationButton={false}>
+                {/* Restaurant Location Marker */}
+                {restaurantLocation && (
+                  <Marker
+                    coordinate={{
+                      latitude: restaurantLocation.latitude,
+                      longitude: restaurantLocation.longitude,
+                    }}
+                    title="Restaurant"
+                    description={restaurantLocation.address || "Restaurant Location"}
+                    pinColor="#FF6B35">
+                    <View style={styles.restaurantMarker}>
+                      <Icon name="restaurant" size={30} color="#FF6B35" />
+                    </View>
+                  </Marker>
+                )}
+
                 {/* Delivery Location Marker */}
                 <Marker
                   coordinate={{
@@ -481,6 +571,10 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  restaurantMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   deliveryMarker: {
     alignItems: 'center',
