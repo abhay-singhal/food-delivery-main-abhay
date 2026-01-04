@@ -94,3 +94,5 @@ Write-Host "Final location: ($([math]::Round($currentLat, 6)), $([math]::Round($
 Write-Host ""
 Write-Host "Check the customer app to see the location updates!" -ForegroundColor Green
 
+
+

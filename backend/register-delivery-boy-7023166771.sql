@@ -73,3 +73,5 @@ WHERE u.mobile_number = '7023166771' AND u.role = 'DELIVERY_BOY';
 
 
 
+
+
