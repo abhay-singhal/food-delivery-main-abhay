@@ -96,3 +96,4 @@ Write-Host "Check the customer app to see the location updates!" -ForegroundColo
 
 
 
+
