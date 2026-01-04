@@ -8,9 +8,6 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -60,50 +57,13 @@ public class JwtUtil {
     public String generateAccessToken(String username, String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
+        // Ensure role is properly set (ADMIN, CUSTOMER, DELIVERY_BOY)
+        claims.put("authorities", "ROLE_" + role.toUpperCase());
         return createToken(claims, username, accessTokenExpiration);
-    }
-    
-    /**
-     * Generate access token for delivery boys that expires at midnight (12:00 AM)
-     */
-    public String generateAccessTokenUntilMidnight(String username, String role) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("role", role);
-        
-        // Calculate milliseconds until midnight (12:00 AM)
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime midnight = LocalDate.now().atTime(LocalTime.MIDNIGHT);
-        
-        // If current time is past midnight, set expiration to next midnight
-        if (now.isAfter(midnight) || now.equals(midnight)) {
-            midnight = midnight.plusDays(1);
-        }
-        
-        long millisecondsUntilMidnight = java.time.Duration.between(now, midnight).toMillis();
-        
-        return createToken(claims, username, millisecondsUntilMidnight);
     }
     
     public String generateRefreshToken(String username) {
         return createToken(new HashMap<>(), username, refreshTokenExpiration);
-    }
-    
-    /**
-     * Generate refresh token for delivery boys that expires at midnight (12:00 AM)
-     */
-    public String generateRefreshTokenUntilMidnight(String username) {
-        // Calculate milliseconds until midnight (12:00 AM)
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime midnight = LocalDate.now().atTime(LocalTime.MIDNIGHT);
-        
-        // If current time is past midnight, set expiration to next midnight
-        if (now.isAfter(midnight) || now.equals(midnight)) {
-            midnight = midnight.plusDays(1);
-        }
-        
-        long millisecondsUntilMidnight = java.time.Duration.between(now, midnight).toMillis();
-        
-        return createToken(new HashMap<>(), username, millisecondsUntilMidnight);
     }
     
     private String createToken(Map<String, Object> claims, String subject, Long expiration) {

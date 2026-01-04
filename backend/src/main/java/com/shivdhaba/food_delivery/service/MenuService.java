@@ -9,15 +9,12 @@ import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import com.shivdhaba.food_delivery.repository.MenuCategoryRepository;
 import com.shivdhaba.food_delivery.repository.MenuItemRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MenuService {
@@ -25,7 +22,7 @@ public class MenuService {
     private final MenuCategoryRepository menuCategoryRepository;
     private final MenuItemRepository menuItemRepository;
     
-    @Cacheable(value = "menu", key = "'all'", unless = "#result == null || #result.isEmpty()")
+    @Cacheable(value = "menu", key = "'all'")
     public List<MenuCategoryResponse> getMenu() {
         List<MenuCategory> categories = menuCategoryRepository.findByIsActiveTrueOrderByDisplayOrderAsc();
         
@@ -47,11 +44,6 @@ public class MenuService {
                             .build();
                 })
                 .collect(Collectors.toList());
-    }
-    
-    @CacheEvict(value = "menu", key = "'all'")
-    public void clearMenuCache() {
-        log.info("Menu cache cleared");
     }
     
     public MenuItemResponse getMenuItem(Long itemId) {

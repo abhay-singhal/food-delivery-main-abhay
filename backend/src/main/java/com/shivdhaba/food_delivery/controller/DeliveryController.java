@@ -4,11 +4,9 @@ import com.shivdhaba.food_delivery.domain.entity.DeliveryBoyDetails;
 import com.shivdhaba.food_delivery.domain.entity.DeliveryTracking;
 import com.shivdhaba.food_delivery.domain.entity.Order;
 import com.shivdhaba.food_delivery.domain.enums.OrderStatus;
-import com.shivdhaba.food_delivery.dto.request.LocationUpdateRequest;
 import com.shivdhaba.food_delivery.dto.response.ApiResponse;
 import com.shivdhaba.food_delivery.dto.response.OrderResponse;
 import com.shivdhaba.food_delivery.dto.response.PaymentResponse;
-import jakarta.validation.Valid;
 import com.shivdhaba.food_delivery.exception.BadRequestException;
 import com.shivdhaba.food_delivery.exception.ResourceNotFoundException;
 import com.shivdhaba.food_delivery.repository.DeliveryBoyDetailsRepository;
@@ -41,20 +39,10 @@ public class DeliveryController {
     private final DeliveryTrackingRepository deliveryTrackingRepository;
     private final NotificationService notificationService;
     private final SecurityUtil securityUtil;
-    private final com.shivdhaba.food_delivery.service.OrderAssignmentService orderAssignmentService;
-    private final com.shivdhaba.food_delivery.service.LocationBroadcastService locationBroadcastService;
     
     @GetMapping("/orders/available")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getAvailableOrders() {
-        // Get orders that are READY (ready for delivery) OR PLACED/ACCEPTED/PREPARING (waiting to be ready)
-        // This allows delivery partners to see orders even before they're marked as READY
-        List<OrderStatus> availableStatuses = List.of(
-            OrderStatus.PLACED,
-            OrderStatus.ACCEPTED,
-            OrderStatus.PREPARING,
-            OrderStatus.READY
-        );
-        List<Order> orders = orderRepository.findUnassignedOrdersByStatuses(availableStatuses);
+        List<Order> orders = orderRepository.findUnassignedOrdersByStatus(OrderStatus.READY);
         List<OrderResponse> orderResponses = orders.stream()
                 .map(orderService::mapToOrderResponse)
                 .toList();
@@ -71,8 +59,25 @@ public class DeliveryController {
             Authentication authentication) {
         var deliveryBoy = securityUtil.getCurrentUser(authentication);
         
-        // Use assignment service for concurrency-safe assignment
-        Order order = orderAssignmentService.assignOrder(orderId, deliveryBoy.getId());
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        
+        if (order.getStatus() != OrderStatus.READY) {
+            throw new BadRequestException("Order is not ready for delivery");
+        }
+        
+        if (order.getDeliveryBoy() != null) {
+            throw new BadRequestException("Order is already assigned");
+        }
+        
+        order.setDeliveryBoy(deliveryBoy);
+        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+        order = orderRepository.save(order);
+        
+        // Send notification to customer
+        notificationService.sendNotificationToUser(order.getCustomer().getId(),
+                "Order Out for Delivery",
+                "Your order #" + order.getOrderNumber() + " is out for delivery");
         
         return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()
                 .success(true)
@@ -84,7 +89,9 @@ public class DeliveryController {
     @PostMapping("/orders/{orderId}/update-location")
     public ResponseEntity<ApiResponse<Void>> updateLocation(
             @PathVariable Long orderId,
-            @Valid @RequestBody LocationUpdateRequest request,
+            @RequestParam Double latitude,
+            @RequestParam Double longitude,
+            @RequestParam(required = false) String address,
             Authentication authentication) {
         var deliveryBoy = securityUtil.getCurrentUser(authentication);
         Order order = orderRepository.findById(orderId)
@@ -96,20 +103,20 @@ public class DeliveryController {
         
         DeliveryTracking tracking = DeliveryTracking.builder()
                 .order(order)
-                .latitude(request.getLatitude())
-                .longitude(request.getLongitude())
-                .address(request.getAddress())
+                .latitude(latitude)
+                .longitude(longitude)
+                .address(address)
                 .build();
         deliveryTrackingRepository.save(tracking);
         
-        // Update and broadcast location to customer and admin
-        locationBroadcastService.updateAndBroadcastLocation(
-                deliveryBoy.getId(), 
-                orderId, 
-                request.getLatitude(), 
-                request.getLongitude(), 
-                request.getAddress()
-        );
+        // Update delivery boy location
+        DeliveryBoyDetails details = deliveryBoyDetailsRepository.findByUser(order.getDeliveryBoy())
+                .orElse(null);
+        if (details != null) {
+            details.setCurrentLatitude(latitude);
+            details.setCurrentLongitude(longitude);
+            deliveryBoyDetailsRepository.save(details);
+        }
         
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
@@ -140,9 +147,6 @@ public class DeliveryController {
         if (order.getPaymentMethod() == com.shivdhaba.food_delivery.domain.enums.PaymentMethod.COD) {
             paymentService.markCodCollected(orderId);
         }
-        
-        // Release delivery partner (makes them available for new orders)
-        orderAssignmentService.releaseDeliveryPartner(orderId);
         
         // Send notifications
         notificationService.sendNotificationToUser(order.getCustomer().getId(),
@@ -206,22 +210,6 @@ public class DeliveryController {
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("FCM token updated successfully")
-                .build());
-    }
-    
-    @PostMapping("/orders/{orderId}/start")
-    public ResponseEntity<ApiResponse<OrderResponse>> startOrder(
-            @PathVariable Long orderId,
-            Authentication authentication) {
-        var deliveryBoy = securityUtil.getCurrentUser(authentication);
-        
-        // Use assignment service to start delivery
-        Order order = orderAssignmentService.startDelivery(orderId, deliveryBoy.getId());
-        
-        return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()
-                .success(true)
-                .message("Order started successfully")
-                .data(orderService.mapToOrderResponse(order))
                 .build());
     }
 }

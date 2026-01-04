@@ -23,9 +23,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT o FROM Order o WHERE o.status = :status AND o.deliveryBoy IS NULL")
     List<Order> findUnassignedOrdersByStatus(@Param("status") OrderStatus status);
     
-    @Query("SELECT o FROM Order o WHERE o.status IN :statuses AND o.deliveryBoy IS NULL ORDER BY o.createdAt DESC")
-    List<Order> findUnassignedOrdersByStatuses(@Param("statuses") List<OrderStatus> statuses);
-    
     @Query("SELECT COUNT(o) FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt < :endDate")
     Long countOrdersBetweenDates(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     

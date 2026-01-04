@@ -34,7 +34,6 @@ public class OrderService {
     private final OrderNumberGenerator orderNumberGenerator;
     private final DistanceUtil distanceUtil;
     private final NotificationService notificationService;
-    private final OrderAssignmentService orderAssignmentService;
     
     @Value("${delivery.city}")
     private String deliveryCity;
@@ -44,9 +43,6 @@ public class OrderService {
     
     @Value("${delivery.charge-per-km}")
     private BigDecimal chargePerKm;
-    
-    @Value("${delivery.free-delivery-radius-km}")
-    private Double freeDeliveryRadiusKm;
     
     @Transactional
     public OrderResponse placeOrder(Long customerId, PlaceOrderRequest request) {
@@ -98,16 +94,7 @@ public class OrderService {
         // Calculate delivery charge
         double distance = distanceUtil.getDistanceFromRestaurant(
                 request.getDeliveryLatitude(), request.getDeliveryLongitude());
-        
-        // Free delivery if within free delivery radius
-        BigDecimal deliveryCharge;
-        if (distance <= freeDeliveryRadiusKm) {
-            deliveryCharge = BigDecimal.ZERO;
-        } else {
-            // Calculate charge for distance beyond free delivery radius
-            double chargeableDistance = distance - freeDeliveryRadiusKm;
-            deliveryCharge = BigDecimal.valueOf(chargeableDistance).multiply(chargePerKm);
-        }
+        BigDecimal deliveryCharge = BigDecimal.valueOf(distance).multiply(chargePerKm);
         
         BigDecimal totalAmount = subtotal.add(deliveryCharge);
         
@@ -217,11 +204,6 @@ public class OrderService {
                         title, "Your order has been accepted");
             }
             case READY -> {
-                // When order becomes READY, notify all available delivery partners
-                // This triggers the assignment flow - all eligible partners receive push notification
-                orderAssignmentService.notifyAvailableDeliveryPartners(order.getId());
-                
-                // Also notify assigned delivery partner if already assigned
                 if (order.getDeliveryBoy() != null) {
                     notificationService.sendNotificationToUser(order.getDeliveryBoy().getId(),
                             title, "Order #" + order.getOrderNumber() + " is ready for pickup");
@@ -236,9 +218,6 @@ public class OrderService {
                         title, "Your order has been delivered");
                 notificationService.sendNotificationToRole("ADMIN",
                         title, "Order #" + order.getOrderNumber() + " has been delivered");
-                
-                // Release delivery partner when order is delivered
-                orderAssignmentService.releaseDeliveryPartner(order.getId());
             }
             default -> {
                 // No notification for other statuses
