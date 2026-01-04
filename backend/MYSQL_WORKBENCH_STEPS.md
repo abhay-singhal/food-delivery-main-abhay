@@ -169,24 +169,3 @@ After successful execution:
 
 **File Path:** `d:\food-delivery\backend\menu_seed_data.sql`
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

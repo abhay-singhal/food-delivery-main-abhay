@@ -40,9 +40,6 @@ public class MenuItem {
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
     
-    @Column(name = "discount_price", precision = 10, scale = 2)
-    private BigDecimal discountPrice;
-    
     @Column(name = "image_url")
     private String imageUrl;
     

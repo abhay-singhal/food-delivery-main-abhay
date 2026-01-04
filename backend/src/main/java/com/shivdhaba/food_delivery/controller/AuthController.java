@@ -2,9 +2,8 @@ package com.shivdhaba.food_delivery.controller;
 
 import com.shivdhaba.food_delivery.domain.enums.Role;
 import com.shivdhaba.food_delivery.dto.request.AdminLoginRequest;
-import com.shivdhaba.food_delivery.dto.request.AdminOtpRequest;
-import com.shivdhaba.food_delivery.dto.request.AdminOtpVerifyRequest;
 import com.shivdhaba.food_delivery.dto.request.AdminRegisterRequest;
+import com.shivdhaba.food_delivery.dto.request.DeliveryBoyRegisterRequest;
 import com.shivdhaba.food_delivery.dto.request.OtpRequest;
 import com.shivdhaba.food_delivery.dto.request.OtpVerifyRequest;
 import com.shivdhaba.food_delivery.dto.response.ApiResponse;
@@ -53,26 +52,6 @@ public class AuthController {
                 .build());
     }
     
-    @PostMapping("/admin/otp/send")
-    public ResponseEntity<ApiResponse<OtpResponse>> sendAdminOtp(@Valid @RequestBody AdminOtpRequest request) {
-        OtpResponse response = authService.sendAdminOtp(request);
-        return ResponseEntity.ok(ApiResponse.<OtpResponse>builder()
-                .success(true)
-                .message("OTP sent successfully")
-                .data(response)
-                .build());
-    }
-    
-    @PostMapping("/admin/otp/verify")
-    public ResponseEntity<ApiResponse<AuthResponse>> verifyAdminOtp(@Valid @RequestBody AdminOtpVerifyRequest request) {
-        AuthResponse response = authService.verifyAdminOtp(request);
-        return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
-                .success(true)
-                .message("Login successful")
-                .data(response)
-                .build());
-    }
-
     @PostMapping("/admin/login")
     public ResponseEntity<ApiResponse<AuthResponse>> adminLogin(@Valid @RequestBody AdminLoginRequest request) {
         AuthResponse response = authService.adminLogin(request);
@@ -100,6 +79,23 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .message("Token refreshed successfully")
+                .data(response)
+                .build());
+    }
+    
+    /**
+     * Public endpoint for delivery boy self-registration.
+     * 
+     * Note: This endpoint is public for convenience during development.
+     * In production, you may want to restrict this or require admin approval.
+     */
+    @PostMapping("/delivery-boy/register")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> registerDeliveryBoy(
+            @Valid @RequestBody DeliveryBoyRegisterRequest request) {
+        java.util.Map<String, Object> response = authService.registerDeliveryBoy(request);
+        return ResponseEntity.status(201).body(ApiResponse.<java.util.Map<String, Object>>builder()
+                .success(true)
+                .message("Delivery boy registered successfully")
                 .data(response)
                 .build());
     }

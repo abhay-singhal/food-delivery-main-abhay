@@ -130,24 +130,3 @@ After running the script, you should have:
 
 **SQL Script Location:** `backend/menu_seed_data.sql`
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
